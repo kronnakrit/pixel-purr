@@ -1,0 +1,12 @@
+:root { --bg: #2A1F4A; --bg2: #3A2C66; --ink: #FBF6FF; --muted: #BFAEE6; --gold: #FFD43B; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; user-select: none; -webkit-user-select: none; }
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#hud { position: fixed; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top) + 10px) 16px 0; pointer-events: none; }
+#hud .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#hud .small { color: var(--muted); font-size: 13px; margin-top: 4px; }
+#title { font-weight: 900; font-size: 20px; }
+.chip { background: rgba(0, 0, 0, .3); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
+#controls { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 12px; padding: 0 16px calc(env(safe-area-inset-bottom) + 16px); }
+#controls button { font: inherit; font-weight: 800; color: var(--bg); background: var(--gold); border: 0; border-radius: 16px; min-width: 52px; height: 48px; padding: 0 18px; font-size: 18px; box-shadow: 0 4px 0 #D79A12; }
+#controls button:active { transform: translateY(3px); box-shadow: 0 1px 0 #D79A12; }
