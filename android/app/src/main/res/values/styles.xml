@@ -18,5 +18,7 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- Android 12+ system splash: the stage colour behind the launcher icon, no white flash. -->
+        <item name="windowSplashScreenBackground">#2A1F4A</item>
     </style>
 </resources>

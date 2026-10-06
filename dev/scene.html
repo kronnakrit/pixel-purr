@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>Pixel Purr · scene</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; user-select: none; color: #fff; font: 800 13px/1.2 'Nunito', system-ui, sans-serif; }
+    body { background: linear-gradient(#4A3A96, #33276F 55%, #231A4F); }
+    body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .05;
+      background-image: radial-gradient(#fff 1.2px, transparent 1.6px); background-size: 97px 173px; }
+    #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    .bar { position: fixed; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; }
+    #top { top: 0; height: 96px; padding-top: 30px; }
+    #bottom { bottom: 0; height: 120px; flex-direction: column; gap: 6px; }
+    .pill { font: 400 18px 'Lilita One', sans-serif; padding: 6px 18px; border-radius: 99px; background: linear-gradient(#5AA2FF, #2D63D8);
+      border: 2.5px solid #24193F; box-shadow: 0 4px 0 #24193F; text-shadow: 0 2px 0 #24193F; white-space: nowrap; }
+    button { font: inherit; color: #fff; border: 2px solid #24193F; border-radius: 14px; background: #5B4BB8; padding: 6px 9px; box-shadow: 0 3px 0 #24193F; }
+    button:active { transform: translateY(2px); box-shadow: 0 1px 0 #24193F; }
+    button.on { background: #2BAF6A; }
+    .boosters { display: flex; gap: 6px; background: rgba(26, 18, 64, .7); border-radius: 22px; padding: 8px 10px; }
+    .boosters button { width: 52px; height: 46px; border-radius: 16px; padding: 0; font-size: 11px; }
+    #status { font-size: 11px; opacity: .8; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <div id="top" class="bar">
+    <button id="prev" aria-label="Previous level">‹</button>
+    <span id="title" class="pill">Level 1</span>
+    <button id="next" aria-label="Next level">›</button>
+    <button id="mode">Auto</button>
+    <button id="restart">↻</button>
+  </div>
+  <div id="bottom" class="bar">
+    <div class="boosters">
+      <button data-b="slot">Cushion</button><button data-b="shuffle">Shuffle</button><button data-b="nap">Nap</button><button data-b="xray">X-Ray</button><button id="win">Win</button>
+    </div>
+    <div id="status"></div>
+  </div>
+  <script type="module" src="../src/render/scene/dev.ts"></script>
+</body>
+</html>
