@@ -2,22 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#2A1F4A" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
   <title>Pixel Purr</title>
-  <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <canvas id="stage"></canvas>
-  <div id="hud">
-    <div class="row"><span id="title">Pixel Purr</span><span id="fps" class="chip">-- fps</span></div>
-    <div class="row small"><span id="info"></span></div>
-  </div>
-  <div id="controls">
-    <button id="prev" aria-label="Previous level">‹</button>
-    <button id="play">Replay</button>
-    <button id="next" aria-label="Next level">›</button>
-  </div>
+  <canvas id="stage" aria-label="Play field"></canvas>
+  <div id="ui"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

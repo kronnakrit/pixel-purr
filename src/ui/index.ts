@@ -2,7 +2,7 @@
 // attaches them. The root only takes pointer events on its own controls, so taps elsewhere reach the canvas.
 import '../fonts';
 import './ui.css';
-import type { BoosterKey, HomeChoice, Sfx, UiApi } from '../app/contracts';
+import type { HomeChoice, Sfx, UiApi } from '../app/contracts';
 import { FONT_BODY, FONT_DISPLAY } from '../fonts';
 import { boosterUnlockCard, buyBoosterCard, dailyCard, failCard, introCard, livesCard, offerCard, pauseCard, winCard } from './cards';
 import { CoinCounter, type Ctx, type Layers } from './ctx';
@@ -17,17 +17,9 @@ export { BOOSTER_INFO } from './boosters';
 export { formatCoins, formatNumber, formatTimer } from './format';
 
 export interface Ui extends UiApi {
-  /** Android back: close the top modal. False when nothing is open (the app then decides: pause, or leave). */
-  closeTop(): boolean;
-  /** UI sounds and haptics (button taps, coin ticks, toggles); route them to audio. */
-  onSfx(cb: (s: Sfx) => void): void;
   readonly hud: Hud;
-  /** Optional 4th argument: whether a rewarded video is ready (hides "1 free with video" when false). */
-  buyBooster(k: BoosterKey, price: number, canAfford: boolean, videoReady?: boolean): Promise<'buy' | 'video' | 'close'>;
   /** Number of open modals. */
   readonly modalsOpen: number;
-  /** True while something opaque covers the whole play field (home screen, shop, Sticker Book): pause rendering. */
-  readonly covered: boolean;
 }
 
 let active: Ui | null = null;
@@ -91,7 +83,7 @@ export function createUi(): Ui {
     boosterUnlock: (k, free) => boosterUnlockCard(modals, k, free),
     win: w => winCard(modals, ctx, w),
     fail: f => failCard(modals, f),
-    pause: (mode, s, onChange) => pauseCard(modals, ctx, mode, s, onChange),
+    pause: (mode, s, onChange, opts) => pauseCard(modals, ctx, mode, s, onChange, opts?.privacy),
     shop: (s, actions) => { hud.setCoins(s.coins); return shopPage(modals, ctx, s, actions); },
     stickerBook: items => stickerPage(modals, ctx, items),
     dailyGift: g => dailyCard(modals, g),

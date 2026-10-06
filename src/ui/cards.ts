@@ -127,7 +127,7 @@ export function failCard(m: Modals, f: FailInfo): Promise<'coins' | 'video' | 'g
 
 // ---------------------------------------------------------------- pause / settings
 
-export function pauseCard(m: Modals, ctx: Ctx, mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void): Promise<'resume' | 'restart' | 'home'> {
+export function pauseCard(m: Modals, ctx: Ctx, mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void, privacy?: () => void): Promise<'resume' | 'restart' | 'home'> {
   const cur = { ...s };
   const sysRM = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   return m.show<'resume' | 'restart' | 'home'>({
@@ -160,6 +160,8 @@ export function pauseCard(m: Modals, ctx: Ctx, mode: 'play' | 'home', s: Setting
         p.body.append(h('div', 'pp-bigrow', big(ICONS.restart(64), 'Restart', 'costs a life', 'restart'), big(ICONS.home(64), 'Home', 'costs a life', 'home')), h('p', 'pp-note', 'Restart or Home costs a life'));
       }
       p.body.append(actions(pill(mode === 'play' ? 'Resume' : 'Done', 'green', () => done('resume'), { cls: 'pp-primary' })));
+      // ad consent rules: the player must be able to change their choices at any time
+      if (privacy) p.body.append(linkBtn('Privacy choices', () => { ctx.sfx('button'); privacy(); }, 'pp-privacy'));
       return p.el;
     },
   });

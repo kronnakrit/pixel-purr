@@ -108,6 +108,8 @@ export interface MetaApi {
   /** Spend a life for a failed or abandoned attempt. Unlimited lives make this free. */
   spendLife(now: number): void;
   refillLives(now: number): void;
+  /** Extra lives (the rewarded 'lives' video). Never above max; a no-op with unlimited lives. */
+  addLives(n: number, now: number): void;
   grantUnlimitedLives(minutes: number, now: number): void;
 
   boosterCount(k: BoosterKey): number;
@@ -133,6 +135,8 @@ export interface MetaApi {
   owns(id: ProductId): boolean;
   /** Apply a completed purchase's contents. */
   applyPurchase(id: ProductId): Reward;
+  /** Restore a one-time product's lasting part (Remove Ads) without granting its coins or boosters again. */
+  restorePurchase(id: ProductId): Reward;
 
   /** Interstitial policy: may an interstitial show now, between levels? */
   mayShowInterstitial(ctx: { level: number; afterLoss: boolean; now: number }): boolean;
@@ -163,6 +167,9 @@ export interface AdsApi {
   rewardedReady(): boolean;
   /** Shows an interstitial if one is loaded. Resolves when it is closed (true if one showed). */
   showInterstitial(): Promise<boolean>;
+  /** The consent rules (GDPR, US states) say the player must be able to change their ad choices: show a button. */
+  readonly privacyOptionsRequired: boolean;
+  showPrivacyOptions(): Promise<void>;
 }
 
 export interface PurchasesApi {
@@ -171,7 +178,11 @@ export interface PurchasesApi {
   buy(id: ProductId): Promise<'purchased' | 'cancelled' | 'failed'>;
   /** Restores non-consumables (Remove Ads, Cosy Bundle). Returns what was restored. */
   restore(): Promise<ProductId[]>;
+  /** Why the last buy() did not complete, for the toast; null after a success. */
+  readonly lastFailure: PurchaseFailure | null;
 }
+
+export type PurchaseFailure = 'cancelled' | 'busy' | 'alreadyOwned' | 'pending' | 'notConfigured' | 'unavailable' | 'store';
 
 export interface RemoteConfigApi {
   init(): Promise<void>;
@@ -289,6 +300,10 @@ export interface HudApi {
   insets(): ScreenInsets;
   /** Screen position of the coin chip (target for flying coins). */
   coinChip(): Point;
+  /** Centre of a booster button, or null when it isn't shown (tutorial pointer). */
+  boosterPoint(k: BoosterKey): Point | null;
+  /** The lives countdown on the chip reached zero: the app should push fresh lives. */
+  onLivesDue(cb: () => void): void;
 }
 
 export interface UiApi {
@@ -300,14 +315,14 @@ export interface UiApi {
   win(w: WinInfo): Promise<'continue' | 'double'>;
   fail(f: FailInfo): Promise<'coins' | 'video' | 'giveup'>;
   /** In-game pause (mode 'play': resume/restart/home) or settings from home (mode 'home': close only). */
-  pause(mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void): Promise<'resume' | 'restart' | 'home'>;
+  pause(mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void, opts?: { privacy?: () => void }): Promise<'resume' | 'restart' | 'home'>;
   shop(s: ShopState, actions: { buy(id: ProductId): Promise<boolean>; video(): Promise<boolean>; restore(): Promise<void> }): Promise<void>;
   stickerBook(items: { n: number; name: string; picture: Picture }[]): Promise<void>;
   dailyGift(g: { day: number; reward: Reward; videoReady: boolean }): Promise<'claim' | 'double'>;
   outOfLives(l: LivesInfo, refillCost: number, canAfford: boolean, videoReady: boolean): Promise<'coins' | 'video' | 'close'>;
   offer(o: OfferInfo): Promise<'buy' | 'close'>;
-  /** Confirm spending coins on a booster the player has none of. */
-  buyBooster(k: BoosterKey, price: number, canAfford: boolean): Promise<'buy' | 'video' | 'close'>;
+  /** Confirm spending coins on a booster the player has none of. videoReady shows the "free with a video" choice. */
+  buyBooster(k: BoosterKey, price: number, canAfford: boolean, videoReady: boolean): Promise<'buy' | 'video' | 'close'>;
   toast(text: string): void;
   /** Coins fly from a point to the coin chip, then the chip bumps. */
   coinsFly(from: Point, amount: number): Promise<void>;
@@ -316,6 +331,12 @@ export interface UiApi {
   /** Full-screen loading veil (first boot, building an endless level). */
   loading(on: boolean): void;
   setReducedMotion(on: boolean): void;
+  /** Android back: close the top modal. False when none is open (the app then decides: pause, or leave). */
+  closeTop(): boolean;
+  /** UI sounds (button taps, coin ticks, toggles), to route to audio. */
+  onSfx(cb: (s: Sfx) => void): void;
+  /** Something opaque covers the whole play field (home, shop, Sticker Book): skip rendering. */
+  readonly covered: boolean;
 }
 
 export type { Level };

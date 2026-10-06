@@ -18,8 +18,6 @@ export interface Hud extends HudApi {
   chipEl(): HTMLElement | null;
   /** Home screen hook: in home mode the gear and the chip's "+" become home choices. */
   onHome(cb: ((c: 'settings' | 'shop') => void) | null): void;
-  /** Fires once when the local lives countdown runs out (call setLives with fresh numbers). */
-  onLivesDue(cb: () => void): void;
 }
 
 /** Coin chip: coin icon, number, optional "+" (shop). Registered as a coin-flight target while connected. */
@@ -177,6 +175,10 @@ export function createHud(ctx: Ctx): Hud {
       if (c) { const r = (c.querySelector('.pp-chip-coin') ?? c).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
       const s = safeAreas(ctx.root);
       return { x: innerWidth - s.right - 90, y: s.top + 34 };
+    },
+    boosterPoint(k) {
+      const r = tiles.get(k)?.b.getBoundingClientRect();
+      return r && r.width > 0 && mode === 'play' ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
     },
     lift(on) { ctx.layers.hud.classList.toggle('pp-lifted', on); },
   };

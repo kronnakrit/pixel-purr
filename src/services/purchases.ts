@@ -1,11 +1,10 @@
 // In-app purchases: RevenueCat on the phone (receipts, restore, both stores), a mock store on the web.
 // This module only reports what happened; the app applies a product's contents with meta.applyPurchase, once.
-import type { Product, ProductId, PurchasesApi } from '../app/contracts';
+import type { Product, ProductId, PurchaseFailure, PurchasesApi } from '../app/contracts';
 import { FALLBACK_PRODUCTS, ONE_TIME_PRODUCTS, PRODUCT_ORDER, REVENUECAT, STORE_PRODUCT_IDS, type NativeOs } from './config';
 import { DEV, errText, localFlag, logger, setLocalFlag, sleep, withTimeout, type Os } from './env';
 
-/** Why the last buy() did not complete, so the UI can say something kind. */
-export type PurchaseFailure = 'cancelled' | 'busy' | 'alreadyOwned' | 'pending' | 'notConfigured' | 'unavailable' | 'store';
+export type { PurchaseFailure } from '../app/contracts';
 
 export interface Purchases extends PurchasesApi {
   readonly lastFailure: PurchaseFailure | null;

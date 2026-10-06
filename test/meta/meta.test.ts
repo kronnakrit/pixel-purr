@@ -249,6 +249,19 @@ describe('lives', () => {
     expect(m.lives(T0 + 2 * MIN)).toMatchObject({ lives: 4, nextInMs: 30 * MIN });
   });
 
+  it('a rewarded extra life adds one, keeps the regen clock, and never goes above max', async () => {
+    const { m } = await setup();
+    for (let i = 0; i < 5; i++) m.spendLife(T0);
+    m.addLives(1, T0 + 10 * MIN);
+    expect(m.lives(T0 + 10 * MIN)).toMatchObject({ lives: 1, nextInMs: 20 * MIN });
+    expect(m.lives(T0 + 30 * MIN)).toMatchObject({ lives: 2, nextInMs: 30 * MIN });
+    m.addLives(9, T0 + 30 * MIN);
+    expect(m.lives(T0 + 30 * MIN)).toMatchObject({ lives: 5, nextInMs: null });
+    m.addLives(0, T0 + 30 * MIN);
+    m.addLives(-2, T0 + 30 * MIN);
+    expect(m.lives(T0 + 30 * MIN).lives).toBe(5);
+  });
+
   it('follow remote-config regen time', async () => {
     const { m } = await setup(T0, { lifeRegenMin: 20 });
     m.spendLife(T0);

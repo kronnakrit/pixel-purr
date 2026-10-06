@@ -7,7 +7,7 @@ import {
 } from 'three';
 import { PALETTE, type BeltRider, type Game, type GameEvent } from '../../engine';
 import type { GameSceneApi, Point, ScreenInsets, TapTarget } from '../../app/contracts';
-import { PurrletView } from '../purrlet';
+import { PurrletView, warmupPurrlets } from '../purrlet';
 import { fontsReady } from '../../fonts';
 import { BeltView, decalMaterial } from './belt';
 import { CatSlot, STYLE, type Place, type Style } from './cats';
@@ -117,6 +117,8 @@ export class GameScene implements GameSceneApi {
     this.L = computeLayout(1, 1, this.insets);
     this.resize();
     void fontsReady().then(() => this.belt.refreshText());
+    // Compile the kitten shaders under the game's own lights now, so the first level doesn't hitch.
+    void warmupPurrlets(this.renderer, { scene: this.scene, camera: this.camera }).catch(e => console.warn('scene: warmup failed', e));
   }
 
   // ---------------------------------------------------------------- layout

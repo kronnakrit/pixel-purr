@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2A1F4A" />
+  <title>Pixel Purr · level pictures</title>
+  <style>
+    html { background: #231A4F; }
+    body { margin: 0; padding: 16px; color: #FBF6FF; font: 800 12px/1.25 'Nunito', system-ui, sans-serif;
+      background: linear-gradient(#4A3A96, #33276F 45%, #231A4F) fixed; }
+    h1 { margin: 0 0 12px; font: 400 26px/1 'Lilita One', sans-serif; -webkit-text-stroke: 5px #24193F; paint-order: stroke fill; }
+    #grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .card { background: #2E2368; border: 3px solid #24193F; border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+    .card.spicy { box-shadow: 0 0 0 2px #FF5C7A; }
+    .card b { font: 400 14px 'Lilita One', sans-serif; -webkit-text-stroke: 3px #24193F; paint-order: stroke fill; }
+    .card i { font-style: normal; color: #BFAEE6; font-size: 10px; text-align: center; }
+    .row { display: flex; gap: 6px; align-items: flex-end; }
+    canvas { image-rendering: pixelated; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Level pictures</h1>
+  <div id="grid"></div>
+  <script type="module" src="../src/content/dev.ts"></script>
+</body>
+</html>

@@ -177,6 +177,15 @@ export async function loadMeta(now: number, economy?: EconomyOverrides, storage:
       p.livesAt = now;
       changed('refill');
     },
+    addLives(n: number, now: number) {
+      const k = Math.floor(n);
+      if (!(k > 0) || unlimited(now)) return;
+      settleLives(now);
+      if (p.lives >= e.maxLives) return;
+      p.lives = Math.min(e.maxLives, p.lives + k);
+      if (p.lives >= e.maxLives) p.livesAt = now;
+      changed('lives:add');
+    },
     grantUnlimitedLives(minutes: number, now: number) {
       if (!(minutes > 0) || !Number.isFinite(minutes)) return;
       extendUnlimited(minutes, now);
