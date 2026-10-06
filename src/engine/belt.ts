@@ -32,6 +32,16 @@ export function target(px: Uint8Array, w: number, h: number, pos: BeltSpot): num
   return -1;
 }
 
+/** X-Ray Specs: index of the first pixel of colour c in line from this spot (other colours don't block), or -1. */
+export function targetOfColor(px: Uint8Array, w: number, h: number, pos: BeltSpot, c: number): number {
+  const { side, i } = pos;
+  if (side === 0) { for (let y = h - 1; y >= 0; y--) if (px[y * w + i] === c) return y * w + i; }
+  else if (side === 1) { for (let x = w - 1; x >= 0; x--) if (px[i * w + x] === c) return i * w + x; }
+  else if (side === 2) { for (let y = 0; y < h; y++) if (px[y * w + i] === c) return y * w + i; }
+  else { for (let x = 0; x < w; x++) if (px[i * w + x] === c) return i * w + x; }
+  return -1;
+}
+
 export interface Rider { c: number; a: number; id?: number }
 /** t = tick, k = rider index in the group, s = belt spot, j = pixel painted. */
 export interface ShotLog { t: number; k: number; s: number; j: number }
