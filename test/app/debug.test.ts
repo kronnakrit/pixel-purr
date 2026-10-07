@@ -31,6 +31,20 @@ describe('__pp', () => {
     expect(h.ui.hud.coins).toBe(1320);
   });
 
+  it('tap() launches a queue the way a finger does, and refuses when nothing can go', async () => {
+    const h = new Harness();
+    h.content.custom.set(1, () => make(['66', '66'], [[[SODA, 2]], [[SODA, 2]]], 5, 1));
+    h.meta.seen.add('basics');
+    const pp = installDebug(h.app, {});
+    await h.start();
+    expect(pp.tap('queue', 0)).toBe(false); // nothing running yet
+    await h.playFromHome();
+    expect(pp.tap('queue', 0)).toBe(true);
+    expect(pp.tap('queue', 1)).toBe(false); // the belt entry is not clear yet
+    expect(pp.tap('tray', 0)).toBe(false);
+    expect(pp.state().session).toMatchObject({ riders: 1, queues: [0, 1] });
+  });
+
   it('autoplay asked before the level starts runs once it does', async () => {
     const h = new Harness();
     h.meta.level = 3;

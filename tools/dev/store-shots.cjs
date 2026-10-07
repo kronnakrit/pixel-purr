@@ -37,14 +37,17 @@ async function capture(b) {
     if (e) e.click();
     return !!e;
   }, sel);
+  // The web build's stand-in ads: close one once its countdown ends.
+  const closeAd = () => click('.pp-mockad .pp-mockad-btn:not(:disabled)');
   // Close whatever card is open the way a player would: skip offers, take the main button otherwise.
   const answer = async m => (m === 'offer' ? (await clickTop('.pp-x')) || clickTop('.pp-link') : m === 'fail' ? (await clickTop('.pp-link')) || clickTop('.pp-primary') : clickTop('.pp-primary'));
 
   // 1. Win levels 1-15 at once so the sticker book has pictures and every booster is unlocked.
   await p.evaluate(() => window.__pp.speed(20));
-  for (let t0 = Date.now(); Date.now() - t0 < 300000;) {
+  for (let t0 = Date.now(); Date.now() - t0 < 600000;) {
     const s = await st();
     if (s.profile.level > 15 && s.screen === 'home' && !s.modal) break;
+    if (await closeAd()) { await sleep(300); continue; }
     if (s.modal) await answer(s.modal);
     else if (s.screen === 'home') await click('.pp-play');
     else if (s.session && s.session.running && s.session.status === 'playing' && !s.session.busy) await p.evaluate(() => window.__pp.win());
@@ -70,6 +73,7 @@ async function capture(b) {
     await p.evaluate(n => window.__pp.play(n), n);
     for (let t0 = Date.now(); Date.now() - t0 < 30000;) {
       const s = await st();
+      if (await closeAd()) { await sleep(300); continue; }
       if (s.modal) await answer(s.modal);
       else if (s.session && s.session.running && s.session.level === n) break;
       await sleep(250);
@@ -81,34 +85,52 @@ async function capture(b) {
     while (result === null) { const s = await st(); if (s.session) await onTick(s.session); await sleep(120); }
     return result;
   };
+  // Autoplay sends one kitten at a time; once the picture is a third done, extra taps put three on the belt.
   let belt = false, tray = false, win = false;
+  let lastLog = 0;
   const tick = async s => {
     const painted = 1 - s.left / s.total;
-    if (!belt && s.riders >= 3 && painted > 0.3 && painted < 0.8) { belt = true; await shot('belt'); }
-    if (!tray && s.tray >= 2 && s.riders >= 1) { tray = true; await shot('tray'); }
+    if (process.env.PP_DEBUG && Date.now() - lastLog > 2000) { lastLog = Date.now(); console.log(`L${s.level} painted ${painted.toFixed(2)} riders ${s.riders} tray ${s.tray}`); }
+    if (!belt && s.riders >= 1 && s.riders < 3 && painted > 0.3 && painted < 0.7) {
+      for (let k = 0; k < 12 && s.riders < 3; k++) {
+        await sleep(90);
+        await p.evaluate(q => window.__pp.tap('queue', q), k % s.queues.length);
+        s = (await st()).session;
+        if (!s) return;
+      }
+    }
+    // slow the belt right down while a frame is taken, so the moment holds still
+    const still = async name => { await p.evaluate(() => window.__pp.speed(0.25)); await shot(name); await p.evaluate(() => window.__pp.speed(1)); };
+    if (!belt && s.riders >= 3 && painted > 0.3 && painted < 0.8) { belt = true; await still('belt'); }
+    if (!tray && s.tray >= 2 && s.riders <= 2) { tray = true; await still('tray'); }
+  };
+  const home = async () => {
+    for (let t0 = Date.now(); Date.now() - t0 < 30000;) {
+      const s = await st();
+      if (s.screen === 'home' && !s.modal && !s.session) break;
+      if (await closeAd()) { await sleep(300); continue; }
+      if (s.modal) await answer(s.modal);
+      await sleep(300);
+    }
   };
   for (const n of [16, 19, 17, 18]) {
     if (belt && tray) break;
     await play(n, tick);
-    if (!win) {
-      for (let t0 = Date.now(); Date.now() - t0 < 1400;) { const s = await st(); if (s.session && s.session.status === 'won') break; await sleep(50); }
-      await sleep(700);
-      await shot('win');
-      win = true;
-    }
-    for (let t0 = Date.now(); Date.now() - t0 < 20000;) {
-      const s = await st();
-      if (s.screen === 'home' && !s.modal) break;
-      if (s.modal) await answer(s.modal);
-      await sleep(300);
-    }
+    await home();
   }
   if (!belt || !tray) console.log('missing:', !belt ? 'belt' : '', !tray ? 'tray' : '');
+  // 2. The win dance over the finished picture (Tabby), played by autoplay alone so it is won.
+  for (const n of [4, 6, 3]) {
+    if (win) break;
+    if ((await play(n, async () => {})) === 'won') { await sleep(600); await shot('win'); win = true; }
+    await home();
+  }
 
   // 4. X-Ray Specs armed and glowing in the booster bar.
   await p.evaluate(() => window.__pp.play(21));
   for (let t0 = Date.now(); Date.now() - t0 < 30000;) {
     const s = await st();
+    if (await closeAd()) { await sleep(300); continue; }
     if (s.modal) await answer(s.modal);
     else if (s.session && s.session.running) break;
     await sleep(250);

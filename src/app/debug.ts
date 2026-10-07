@@ -4,6 +4,7 @@
 //   __pp.autoplay()     play the current level's stored solution through the tap path; resolves 'won' / 'lost'
 //   __pp.win() / lose() finish the current attempt at once and run the real win / lose flow
 //   __pp.speed(k)       run the belt k times faster (1 = normal, up to 20)
+//   __pp.tap(kind, i)   tap queue i or tray slot i, as a finger would ('queue' | 'tray'); false if nothing launched
 //   __pp.addCoins(n)    __pp.resetProfile()
 import { BOOSTER_KEYS, type BoosterKey } from './contracts';
 import type { App } from './controller';
@@ -15,6 +16,7 @@ export interface PixelPurrDebug {
   win(): boolean;
   lose(): boolean;
   speed(k: number): number;
+  tap(kind: 'queue' | 'tray', i: number): boolean;
   addCoins(n: number): number;
   resetProfile(): Promise<boolean>;
 }
@@ -51,6 +53,13 @@ export function installDebug(app: App, target: object = globalThis): PixelPurrDe
     win: () => app.session?.forceWin() ?? false,
     lose: () => app.session?.forceLose() ?? false,
     speed: k => app.debugSpeed(k),
+    tap: (kind, i) => {
+      const s = app.session, g = s?.game;
+      if (!s || !g || !s.running) return false;
+      const before = g.riders.length;
+      s.tap(kind === 'tray' ? { kind: 'tray', i } : { kind: 'queue', q: i });
+      return g.riders.length > before;
+    },
     addCoins: n => { app.debugAddCoins(n); return app.meta.coins; },
     resetProfile: () => app.debugReset(),
   };
