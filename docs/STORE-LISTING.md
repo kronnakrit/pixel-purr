@@ -93,7 +93,7 @@ Suggested set, in order, each with a one-line caption on top in Lilita One:
 5. The sticker book with a dozen pictures — "Collect 60 cute pictures"
 6. The daily gift ladder — "A gift every day"
 
-`npm run dev` plus the `?debug` hooks (`window.__pp`) can jump straight to any level for these shots.
+`tools/dev/store-shots.cjs` takes this set from the real game in headless Chromium: with `npm run dev` running, `node tools/dev/store-shots.cjs http://localhost:5173/ store-shots` writes the App Store 6.9" set (`ios/`), the Play set and the feature graphic (`play/`), and the raw phone captures (`raw/`). The captions and the feature graphic are drawn by `dev/store.html`. Retake them from a simulator before release if the app changes; `window.__pp` in the browser console can jump to any level.
 
 ## Before you submit
 
