@@ -83,7 +83,7 @@ export function createUi(): Ui {
     boosterUnlock: (k, free) => boosterUnlockCard(modals, k, free),
     win: w => winCard(modals, ctx, w),
     fail: f => failCard(modals, f),
-    pause: (mode, s, onChange, opts) => pauseCard(modals, ctx, mode, s, onChange, opts?.privacy),
+    pause: (mode, s, onChange, opts) => pauseCard(modals, ctx, mode, s, onChange, opts),
     shop: (s, actions) => { hud.setCoins(s.coins); return shopPage(modals, ctx, s, actions); },
     stickerBook: items => stickerPage(modals, ctx, items),
     dailyGift: g => dailyCard(modals, g),

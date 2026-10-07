@@ -398,6 +398,10 @@
 }
 .pp-pbody::-webkit-scrollbar { display: none; }
 .pp-pbody > .pp-actions { margin-top: 22px; }
+.pp-legal { display: flex; justify-content: center; flex-wrap: wrap; gap: 0 6px; margin-top: 4px; }
+.pp-legal .pp-link { font-size: 14px; min-height: 44px; }
+.pp-restore-row { display: flex; justify-content: flex-end; margin: -6px 0 4px; }
+.pp-restore-row .pp-link { font-size: 14px; min-height: 44px; }
 .pp-stickcount { padding: 0 14px 0 28px; min-width: 70px; justify-content: center; }
 .pp-stickcount .pp-chip-ic { left: -14px; top: -4px; width: 42px; height: 42px; }
 .pp-stickcount .pp-chip-ic > svg { width: 42px; height: 42px; }

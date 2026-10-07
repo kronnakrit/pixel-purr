@@ -16,6 +16,7 @@ export interface BeltRider {
 }
 
 export type GameEvent =
+  /** xray: the first Purrlet in ids wears X-Ray Specs for this lap. */
   | { type: 'launch'; ids: number[]; from: 'queue' | 'tray'; xray?: boolean }
   | { type: 'shot'; id: number; s: number; j: number }
   | { type: 'pop'; id: number }
@@ -52,12 +53,15 @@ export class Game {
   xrayArmed = false;
   private readonly spots;
   private readonly byId = new Map<number, Purrlet>();
+  /** Mystery Purrlets that have reached a queue front: they stay revealed wherever a booster moves them. */
+  private readonly seen = new Set<number>();
 
   constructor(level: Level) {
     this.level = level;
     this.px = level.px.slice();
     this.queues = level.queues.map(q => q.map(p => ({ ...p })));
     for (const q of this.queues) for (const p of q) this.byId.set(p.id, p);
+    for (const q of this.queues) if (q[0]?.hidden) this.seen.add(q[0].id);
     this.trayCap = level.tray;
     this.left = level.total;
     this.spots = beltOf(level.w, level.h);
@@ -74,8 +78,8 @@ export class Game {
   /** Queue index of a waiting Purrlet, or -1. */
   queueOf(id: number): number { return this.queues.findIndex(q => q.some(p => p.id === id)); }
 
-  /** Mystery Purrlets show their colour only once they reach the front. */
-  isRevealed(p: Purrlet): boolean { return !p.hidden || this.queues[p.q]?.[0] === p; }
+  /** Mystery Purrlets show their colour once they reach the front, and keep showing it after that. */
+  isRevealed(p: Purrlet): boolean { return !p.hidden || this.seen.has(p.id) || this.queues[p.q]?.[0] === p; }
 
   /** The queues a tap on queue q launches: [q], both queues of a linked pair, or null if it can't go now. */
   launchGroup(q: number): number[] | null {
@@ -105,12 +109,13 @@ export class Game {
     const qs = this.launchGroup(q)!, ids: number[] = [], xray = this.takeXray();
     qs.forEach((qq, k) => {
       const p = this.queues[qq]!.shift()!;
-      this.riders.push({ id: p.id, c: p.c, a: p.a, s: k === 0 ? 0 : -k * RULES.gap, ...(xray ? { xray } : {}) });
+      // X-Ray Specs go to one Purrlet: the first of a linked pair
+      this.riders.push({ id: p.id, c: p.c, a: p.a, s: k === 0 ? 0 : -k * RULES.gap, ...(xray && k === 0 ? { xray } : {}) });
       ids.push(p.id);
     });
     this.renumber();
     const ev: GameEvent[] = [{ type: 'launch', ids, from: 'queue', ...(xray ? { xray } : {}) }];
-    for (const qq of qs) { const f = this.front(qq); if (f?.hidden) ev.push({ type: 'reveal', id: f.id }); }
+    ev.push(...this.revealFronts());
     return ev;
   }
 
@@ -168,18 +173,35 @@ export class Game {
     return ev;
   }
 
-  /** Yarn Shuffle: re-deal every waiting Purrlet into new places. Linked pairs stay where they are. */
-  canShuffle(): boolean { return this.status === 'playing' && this.queues.some(q => q.some(p => p.link === undefined)); }
+  /** What the player sees of a waiting Purrlet: two with the same look are interchangeable. */
+  private look(p: Purrlet): string { return this.isRevealed(p) ? `${p.c}:${p.a}` : '?'; }
+
+  private freeWaiting(): Purrlet[] { return this.queues.flatMap(q => q.filter(p => p.link === undefined)); }
+
+  /** Yarn Shuffle: re-deal every waiting Purrlet into new places. Linked pairs stay where they are.
+   *  Only offered when a re-deal can change what the player sees (two or more different-looking Purrlets). */
+  canShuffle(): boolean { return this.status === 'playing' && new Set(this.freeWaiting().map(p => this.look(p))).size > 1; }
 
   shuffleQueues(r: Rng): GameEvent[] {
     if (!this.canShuffle()) return [];
     const free: Purrlet[] = [], slots: [number, number][] = [];
     this.queues.forEach((q, qi) => q.forEach((p, d) => { if (p.link === undefined) { free.push(p); slots.push([qi, d]); } }));
+    const before = free.map(p => this.look(p)).join();
     for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [free[i], free[j]] = [free[j]!, free[i]!]; }
+    // a deal that looks the same would waste the booster: rotate by one (with two different looks this always changes it)
+    if (free.map(p => this.look(p)).join() === before) free.push(free.shift()!);
     slots.forEach(([qi, d], k) => { const p = free[k]!; p.q = qi; this.queues[qi]![d] = p; });
     this.renumber();
-    const ev: GameEvent[] = [{ type: 'shuffle', order: this.queues.map(q => q.map(p => p.id)) }];
-    for (const q of this.queues) if (q[0]?.hidden) ev.push({ type: 'reveal', id: q[0].id });
+    return [{ type: 'shuffle', order: this.queues.map(q => q.map(p => p.id)) }, ...this.revealFronts()];
+  }
+
+  /** Mystery Purrlets that just reached a queue front for the first time. */
+  private revealFronts(): GameEvent[] {
+    const ev: GameEvent[] = [];
+    for (const q of this.queues) {
+      const f = q[0];
+      if (f?.hidden && !this.seen.has(f.id)) { this.seen.add(f.id); ev.push({ type: 'reveal', id: f.id }); }
+    }
     return ev;
   }
 

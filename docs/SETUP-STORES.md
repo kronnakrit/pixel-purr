@@ -40,7 +40,7 @@ Create these 7 products in **both** App Store Connect (In-App Purchases) and Pla
 | `coins_jar` | 12,000 coins | Consumable | $9.99 |
 | `coins_treasure` | 28,000 coins | Consumable | $19.99 |
 | `cosy_bundle` | Remove Ads + 3 of each booster + 2,000 coins | Non-Consumable | $6.99 |
-| `starter_bundle` | 2,500 coins + 2 of each booster | Non-Consumable | $1.99 |
+| `starter_bundle` | 2,500 coins + 2 of each booster | Consumable (the game offers it once) | $1.99 |
 | `remove_ads` | No interstitial ads | Non-Consumable | $3.99 |
 
 - [ ] App Store Connect: sign the **Paid Apps agreement** and fill in tax and banking first, or products never load.
@@ -52,7 +52,7 @@ Create these 7 products in **both** App Store Connect (In-App Purchases) and Pla
 - [ ] Create a free account at revenuecat.com and a project "Pixel Purr".
 - [ ] Add the **App Store** app: bundle id, plus an **In-App Purchase Key** (App Store Connect → Users and Access → Integrations → In-App Purchase, download the .p8 file).
 - [ ] Add the **Play Store** app: package name, plus a Google Cloud **service account** JSON with access in Play Console (RevenueCat's guide walks through it; it can take up to a day to start working).
-- [ ] Import the 7 products. For the Play app, mark `cosy_bundle`, `starter_bundle` and `remove_ads` as **non-consumable** (RevenueCat consumes Play one-time products unless told otherwise, which would let people buy them twice).
+- [ ] Import the 7 products. For the Play app, mark `cosy_bundle` and `remove_ads` as **non-consumable** (RevenueCat consumes Play one-time products unless told otherwise, which would let people buy them twice). The Starter Bundle holds only coins and boosters, so it is a consumable; the game shows its offer once.
 - [ ] Create an entitlement `remove_ads` and attach both `remove_ads` and `cosy_bundle` to it, so Restore brings back no-ads either way. (Offerings and paywalls are not needed; the game loads products by id.)
 - [ ] Copy the **public SDK keys** (Project → API keys) into config.ts: `REVENUECAT.apiKey.ios` (`appl_…`) and `.android` (`goog_…`). These public keys are safe to ship in the app.
 - [ ] Test: iOS with a Sandbox tester account (Settings → App Store → Sandbox Account on the phone); Android with a license tester account on an internal testing build.
@@ -73,7 +73,7 @@ Lets you tune numbers without an app update. Put a small JSON file on any static
 
 ## 6. Privacy forms and policy
 
-- [ ] Write a privacy policy (ads and in-app purchases require one) and link it in both stores.
+- [ ] A privacy policy is ready in `docs/privacy.html`. Fill in its **REPLACE BEFORE RELEASE** lines (date, your name, contact email), then host it: the easiest way is GitHub Pages (repo Settings → Pages → branch `main`, folder `/docs`), which serves it at `https://kronnakrit.github.io/pixel-purr/privacy.html`. The settings card links to `LEGAL.privacyPolicyUrl` in config.ts; change it if you host it elsewhere. Put the same address in both stores.
 - [ ] App Store Connect → App Privacy: declare what the Google Mobile Ads SDK collects (Google's "Prepare for Apple's App Store data disclosure requirements" page lists it: device id, advertising and usage data, diagnostics, coarse location) plus purchase history (RevenueCat).
 - [ ] Play Console → App content: **Ads** = yes, **Advertising ID** = yes (used for advertising), **Data safety** with the same data as above, target audience **18+ or 13+** (not children).
 - [ ] Export compliance (asked on every iOS upload): the app's only encryption is the system's HTTPS. Answer Apple's questions on that basis; once you know your answer you can add `ITSAppUsesNonExemptEncryption` to `Info.plist` so it isn't asked again.

@@ -252,7 +252,7 @@
 	</array>
 	<!-- App Tracking Transparency prompt text (shown once, after the consent form). -->
 	<key>NSUserTrackingUsageDescription</key>
-	<string>Pixel Purr uses this to show you fewer, more relevant ads.</string>
+	<string>Your data will be used to show you ads that suit you better. You will see the same number of ads either way.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

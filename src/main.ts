@@ -8,7 +8,7 @@ import { content } from './content';
 import { fontsReady } from './fonts';
 import { loadMeta, PRODUCTS, PROFILE_KEY, type EconomyOverrides } from './meta';
 import { createGameScene } from './render';
-import { ads, analytics, platform, purchases, remoteConfig } from './services';
+import { ads, analytics, LEGAL, platform, purchases, remoteConfig } from './services';
 import { createUi } from './ui';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#stage');
@@ -28,6 +28,7 @@ const app = new App({
   products: PRODUCTS,
   fontsReady,
   resetProfile: () => Preferences.remove({ key: PROFILE_KEY }),
+  privacyPolicyUrl: LEGAL.privacyPolicyUrl,
 });
 
 if (import.meta.env.DEV) void import('./app/debug').then(d => d.installDebug(app));

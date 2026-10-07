@@ -19,7 +19,7 @@ describe('product mapping', () => {
       expect(new Set(Object.values(STORE_PRODUCT_IDS[os])).size).toBe(7);
     }
     expect(FALLBACK_PRODUCTS.map(p => p.id)).toEqual(PRODUCT_ORDER);
-    expect(ONE_TIME_PRODUCTS).toEqual(['cosy_bundle', 'starter_bundle', 'remove_ads']);
+    expect(ONE_TIME_PRODUCTS).toEqual(['cosy_bundle', 'remove_ads']); // the Starter Bundle is a consumable
   });
 
   it('ignores a Play ":plan" suffix and unknown products', () => {
@@ -27,7 +27,7 @@ describe('product mapping', () => {
     expect(productIdForStore('ios', 'something_else')).toBeNull();
   });
 
-  it('merges localized store prices over the fallback list, in game order', () => {
+  it('merges localized store prices in game order; a product the store did not return is not for sale', () => {
     const store: StoreProductLike[] = [
       { identifier: 'remove_ads', priceString: '149,00 ฿' },
       { identifier: 'coins_pouch', priceString: '35,00 ฿' },
@@ -37,14 +37,14 @@ describe('product mapping', () => {
     expect(list.map(p => p.id)).toEqual(PRODUCT_ORDER);
     expect(list.find(p => p.id === 'coins_pouch')?.price).toBe('35,00 ฿');
     expect(list.find(p => p.id === 'remove_ads')?.price).toBe('149,00 ฿');
-    expect(list.find(p => p.id === 'coins_jar')?.price).toBe('$9.99'); // missing in the store: fallback
+    expect(list.find(p => p.id === 'coins_jar')?.price).toBe(''); // missing in the store: never a made-up $ price
     expect(list.find(p => p.id === 'cosy_bundle')?.title).toBe('Cosy Bundle');
   });
 
   it('reads owned one-time products from purchases and entitlements', () => {
     expect(ownedFromCustomerInfo('ios', info({ allPurchasedProductIdentifiers: ['coins_pouch', 'cosy_bundle', 'mystery'] }))).toEqual(['cosy_bundle']);
-    expect(ownedFromCustomerInfo('android', info({ nonSubscriptionTransactions: [{ productIdentifier: 'starter_bundle' }, { productIdentifier: 'coins_jar' }] })))
-      .toEqual(['starter_bundle']);
+    expect(ownedFromCustomerInfo('android', info({ nonSubscriptionTransactions: [{ productIdentifier: 'remove_ads' }, { productIdentifier: 'coins_jar' }, { productIdentifier: 'starter_bundle' }] })))
+      .toEqual(['remove_ads']);
     expect(ownedFromCustomerInfo('ios', info({ allPurchasedProductIdentifiers: ['remove_ads'], entitlements: { active: { remove_ads: {}, unknown: {} } } })))
       .toEqual(['remove_ads']);
   });
@@ -112,14 +112,14 @@ describe('web mock store', () => {
 });
 
 describe('phone without a RevenueCat key', () => {
-  it('shows fallback prices and fails purchases politely', async () => {
+  it('sells nothing and fails purchases and restore politely', async () => {
     const p = createPurchases({ native: true, os: 'ios', apiKey: '' });
     expect(p.mode).toBe('disabled');
     await p.init();
-    expect(await p.products()).toEqual(FALLBACK_PRODUCTS.map(x => ({ ...x })));
+    expect(await p.products()).toEqual(FALLBACK_PRODUCTS.map(x => ({ ...x, price: '' })));
     expect(await p.buy('remove_ads')).toBe('failed');
     expect(p.lastFailure).toBe('notConfigured');
-    expect(await p.restore()).toEqual([]);
+    await expect(p.restore()).rejects.toThrow();
     expect(console.warn).toHaveBeenCalled();
   });
 });
@@ -137,6 +137,7 @@ describe('RevenueCat', () => {
       }),
       restore: vi.fn(async () => info({ allPurchasedProductIdentifiers: [...(o.owned ?? []), ...purchased] })),
       customerInfo: vi.fn(async () => info({ allPurchasedProductIdentifiers: [...(o.owned ?? []), ...purchased] })),
+      onCustomerInfo: vi.fn((_cb: (i: CustomerInfoLike) => void) => {}),
     } satisfies PurchasesBridge;
     return bridge;
   }
@@ -157,9 +158,32 @@ describe('RevenueCat', () => {
     expect(b.getProducts).toHaveBeenCalledTimes(1); // cached for the session
   });
 
-  it('falls back to the default list when the store returns nothing', async () => {
-    const p = make(fakeBridge({ products: [] }));
-    expect((await p.products()).map(x => x.price)).toEqual(FALLBACK_PRODUCTS.map(x => x.price));
+  it('sells nothing when the store returns nothing, and asks again next time', async () => {
+    const b = fakeBridge({ products: [] });
+    const p = make(b);
+    expect((await p.products()).map(x => x.price)).toEqual(FALLBACK_PRODUCTS.map(() => ''));
+    b.getProducts.mockImplementation(async (ids: string[]) => ids.map(id => ({ identifier: id, priceString: '฿35' })));
+    expect((await p.products()).every(x => x.price === '฿35')).toBe(true);
+  });
+
+  it('reports store transactions at start-up, on store updates and on resume, with the last purchase id', async () => {
+    const b = fakeBridge();
+    const txns = [{ productIdentifier: 'coins_basket', transactionIdentifier: 'T1', purchaseDateMillis: 1000 }, { productIdentifier: 'nope', transactionIdentifier: 'T2', purchaseDateMillis: 1 }];
+    b.customerInfo.mockImplementation(async () => info({ nonSubscriptionTransactions: txns }));
+    b.purchase.mockImplementation(async (storeId: string) => ({ productIdentifier: storeId, transactionId: 'T9' }));
+    let resume = () => {};
+    const p = createPurchases({ native: true, os: 'android', apiKey: 'goog_test', bridge: async () => b, onResume: cb => { resume = cb; } });
+    const seen: unknown[] = [];
+    p.onTransactions(l => seen.push(l));
+    await p.init();
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]).toEqual([{ id: 'coins_basket', txn: 'T1', at: 1000 }]);
+    b.onCustomerInfo.mock.calls[0]![0](info({ nonSubscriptionTransactions: [] }));
+    expect(seen).toHaveLength(2);
+    resume();
+    await vi.waitFor(() => expect(seen).toHaveLength(3));
+    expect(await p.buy('coins_pouch')).toBe('purchased');
+    expect(p.lastTransaction).toBe('T9');
   });
 
   it('buys, maps cancel and failure codes', async () => {
@@ -195,7 +219,7 @@ describe('RevenueCat', () => {
 
   it('restores one-time products only', async () => {
     const p = make(fakeBridge({ owned: ['coins_pouch', 'remove_ads', 'starter_bundle'] }));
-    expect(await p.restore()).toEqual(['starter_bundle', 'remove_ads']);
+    expect(await p.restore()).toEqual(['remove_ads']);
   });
 
   it('survives a configure failure', async () => {
@@ -203,12 +227,12 @@ describe('RevenueCat', () => {
     expect((await p.products()).length).toBe(7);
     expect(await p.buy('coins_pouch')).toBe('failed');
     expect(p.lastFailure).toBe('unavailable');
-    expect(await p.restore()).toEqual([]);
+    await expect(p.restore()).rejects.toThrow();
   });
 
-  it('restore never throws', async () => {
+  it('a restore that fails rejects, so the player is not told they own nothing', async () => {
     const b = fakeBridge();
     b.restore.mockRejectedValueOnce(new Error('network'));
-    expect(await make(b).restore()).toEqual([] as ProductId[]);
+    await expect(make(b).restore()).rejects.toThrow('network');
   });
 });

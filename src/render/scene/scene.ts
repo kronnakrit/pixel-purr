@@ -174,7 +174,7 @@ export class GameScene implements GameSceneApi {
     for (const e of events) {
       switch (e.type) {
         case 'launch':
-          for (const id of e.ids) { const c = this.byId.get(id); if (c) { c.view.hop(); c.xray = !!e.xray; } }
+          for (const id of e.ids) { const c = this.byId.get(id); if (c) { c.view.hop(); c.xray = !!e.xray && id === e.ids[0]; } }
           break;
         case 'shot': this.shot(e.id, e.s, e.j); break;
         case 'pop': this.popCat(e.id); break;
@@ -371,7 +371,8 @@ export class GameScene implements GameSceneApi {
       case 'belt': {
         const r = this.riderOf(c.id);
         if (r) {
-          this.belt.path.point(riderArc(this.arcs, r.s, this.frac, this.grid.cell), pt);
+          // glide from the spot it just painted from (r.s - 1) to the next one, so it faces the line it paints
+          this.belt.path.point(riderArc(this.arcs, r.s > 0 ? r.s - 1 : r.s, r.s > 0 ? this.frac : 0, this.grid.cell), pt);
           c.tx = pt.x; c.ty = pt.y + RIDER_DROP * L.riderW;
         }
         c.tw = L.riderW; c.tdim = 0;

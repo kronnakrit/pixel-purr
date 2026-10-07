@@ -143,6 +143,21 @@ describe('levelMeta', () => {
     expect(Object.values(unlocks).sort()).toEqual([...BOOSTER_KEYS].sort());
   });
 
+  it('each intro level shows its mechanic', () => {
+    const has: Record<IntroKey, (L: Level) => boolean> = {
+      basics: () => true,
+      tray: L => L.tray > 0,
+      spicy: L => L.P.spicy,
+      mystery: L => L.queues.some(q => q.some(p => p.hidden && p.d > 0)),
+      linked: L => L.queues.some(q => q.some(p => p.link !== undefined)),
+      background: L => !L.px.includes(0),
+    };
+    for (let n = 1; n <= 20; n++) {
+      const k = content.levelMeta(n).intro;
+      if (k) expect(has[k](content.getLevel(n)), `level ${n} (${k})`).toBe(true);
+    }
+  });
+
   it('rejects bad level numbers', () => {
     expect(() => content.levelMeta(0)).toThrow();
     expect(() => content.getLevel(1.5)).toThrow();

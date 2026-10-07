@@ -32,7 +32,12 @@ export const ads: Ads = createAds({
   onResume: cb => { platform.onPause(paused => { if (!paused) cb(); }); },
 });
 
-export const purchases: Purchases = createPurchases({ native, os, track: (name, params) => analytics.event(name, params) });
+export const purchases: Purchases = createPurchases({
+  native,
+  os,
+  track: (name, params) => analytics.event(name, params),
+  onResume: cb => { platform.onPause(paused => { if (!paused) cb(); }); },
+});
 
 export type { Ads } from './ads';
 export type { Analytics, AnalyticsEntry, AnalyticsParams, AnalyticsSink } from './analytics';
@@ -40,3 +45,4 @@ export type { Platform } from './platform';
 export type { PurchaseFailure, Purchases } from './purchases';
 export type { RemoteConfig } from './remoteConfig';
 export { REMOTE_DEFAULTS } from './remoteConfig';
+export { LEGAL } from './config';

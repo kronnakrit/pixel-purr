@@ -1,6 +1,6 @@
 // In-app purchases: RevenueCat on the phone (receipts, restore, both stores), a mock store on the web.
 // This module only reports what happened; the app applies a product's contents with meta.applyPurchase, once.
-import type { Product, ProductId, PurchaseFailure, PurchasesApi } from '../app/contracts';
+import type { Product, ProductId, PurchaseFailure, PurchasesApi, StoreTransaction } from '../app/contracts';
 import { FALLBACK_PRODUCTS, ONE_TIME_PRODUCTS, PRODUCT_ORDER, REVENUECAT, STORE_PRODUCT_IDS, type NativeOs } from './config';
 import { DEV, errText, localFlag, logger, setLocalFlag, sleep, withTimeout, type Os } from './env';
 
@@ -13,9 +13,10 @@ export interface Purchases extends PurchasesApi {
 }
 
 export interface StoreProductLike { identifier: string; priceString: string }
+export interface TransactionLike { productIdentifier: string; transactionIdentifier?: string; purchaseDate?: string; purchaseDateMillis?: number }
 export interface CustomerInfoLike {
   allPurchasedProductIdentifiers: string[];
-  nonSubscriptionTransactions?: { productIdentifier: string }[];
+  nonSubscriptionTransactions?: TransactionLike[];
   entitlements: { active: Record<string, unknown> };
 }
 
@@ -23,9 +24,11 @@ export interface CustomerInfoLike {
 export interface PurchasesBridge {
   configure(apiKey: string): Promise<void>;
   getProducts(storeIds: string[]): Promise<StoreProductLike[]>;
-  purchase(storeId: string): Promise<{ productIdentifier: string }>;
+  purchase(storeId: string): Promise<{ productIdentifier: string; transactionId?: string }>;
   restore(): Promise<CustomerInfoLike>;
   customerInfo(): Promise<CustomerInfoLike>;
+  /** RevenueCat calls back whenever the customer's purchases change (e.g. an Ask to Buy approval). */
+  onCustomerInfo(cb: (info: CustomerInfoLike) => void): void;
 }
 
 export interface PurchasesDeps {
@@ -39,6 +42,9 @@ export interface PurchasesDeps {
   setFlag?: (key: string, value: string | null) => void;
   mockDelayMs?: number;
   track?: (name: string, params: Record<string, string | number | boolean>) => void;
+  /** Called when the app comes back to the foreground: purchases that settled meanwhile are reported then. */
+  onResume?: (cb: () => void) => void;
+  now?: () => number;
 }
 
 const log = logger('purchases');
@@ -56,14 +62,23 @@ export function productIdForStore(os: NativeOs, storeId: string): ProductId | nu
   return PRODUCT_ORDER.find(id => STORE_PRODUCT_IDS[os][id] === base) ?? null;
 }
 
-/** The shop list in game order: the store's localized price where the store returned the product, else the fallback. */
+/** The shop list in game order with the store's localized prices. A product the store did not return has price ''
+ *  (not for sale right now): a hard-coded dollar price next to local ones would be wrong, and buying it would fail. */
 export function mergeProducts(os: NativeOs, store: readonly StoreProductLike[]): Product[] {
   const byId = new Map<ProductId, StoreProductLike>();
   for (const p of store) { const id = productIdForStore(os, p.identifier); if (id) byId.set(id, p); }
-  return FALLBACK_PRODUCTS.map(f => {
-    const s = byId.get(f.id);
-    return s?.priceString ? { ...f, price: s.priceString } : { ...f };
-  });
+  return FALLBACK_PRODUCTS.map(f => ({ ...f, price: byId.get(f.id)?.priceString ?? '' }));
+}
+
+/** One-off transactions from the store's customer info, as the app sees them. */
+export function transactionsOf(os: NativeOs, info: CustomerInfoLike): StoreTransaction[] {
+  const out: StoreTransaction[] = [];
+  for (const t of info.nonSubscriptionTransactions ?? []) {
+    const id = productIdForStore(os, t.productIdentifier);
+    const at = t.purchaseDateMillis ?? (t.purchaseDate ? Date.parse(t.purchaseDate) : NaN);
+    if (id && t.transactionIdentifier && Number.isFinite(at)) out.push({ id, txn: t.transactionIdentifier, at });
+  }
+  return out;
 }
 
 /** One-time products the customer owns, from purchases and active entitlements, in game order. */
@@ -86,6 +101,8 @@ export function failureOf(e: unknown): PurchaseFailure {
 }
 
 const fallbackList = (): Product[] => FALLBACK_PRODUCTS.map(p => ({ ...p }));
+/** On a phone without store prices nothing is for sale (see mergeProducts). */
+const unavailableList = (): Product[] => FALLBACK_PRODUCTS.map(p => ({ ...p, price: '' }));
 
 export function createPurchases(d: PurchasesDeps): Purchases {
   if (!d.native) return mockPurchases(d);
@@ -97,8 +114,10 @@ export function createPurchases(d: PurchasesDeps): Purchases {
 // ---------------------------------------------------------------- web mock
 
 function mockPurchases(d: PurchasesDeps): Purchases {
-  const flag = d.flag ?? localFlag, setFlag = d.setFlag ?? setLocalFlag, delay = d.mockDelayMs ?? 600;
-  let busy = false, lastFailure: PurchaseFailure | null = null;
+  const flag = d.flag ?? localFlag, setFlag = d.setFlag ?? setLocalFlag, delay = d.mockDelayMs ?? 600, now = d.now ?? Date.now;
+  let busy = false, lastFailure: PurchaseFailure | null = null, lastTransaction: string | null = null, seq = 0;
+  const txns: StoreTransaction[] = [], listeners: ((l: StoreTransaction[]) => void)[] = [];
+  const record = (id: ProductId) => { const t = { id, txn: `mock-${now()}-${++seq}`, at: now() }; txns.push(t); return t; };
   const owned = (): ProductId[] => {
     try {
       const v: unknown = JSON.parse(flag(MOCK_OWNED_KEY) ?? '[]');
@@ -108,6 +127,8 @@ function mockPurchases(d: PurchasesDeps): Purchases {
   return {
     mode: 'mock',
     get lastFailure() { return lastFailure; },
+    get lastTransaction() { return lastTransaction; },
+    onTransactions(cb) { listeners.push(cb); },
     async init() { log.info('web: mock store'); },
     async products() { return fallbackList(); },
     async buy(id) {
@@ -118,18 +139,26 @@ function mockPurchases(d: PurchasesDeps): Purchases {
         const mode = flag(MOCK_BUY_KEY);
         if (mode === 'cancel') { lastFailure = 'cancelled'; return 'cancelled'; }
         if (mode === 'fail') { lastFailure = 'store'; return 'failed'; }
+        if (mode === 'pending') {
+          // like Ask to Buy: the purchase is approved a little later and reported then
+          setTimeout(() => { record(id); listeners.forEach(f => f([...txns])); }, delay * 5);
+          lastFailure = 'pending';
+          return 'failed';
+        }
         if (isOneTime(id)) {
           const o = owned();
           if (o.includes(id)) { lastFailure = 'alreadyOwned'; return 'failed'; } // like the real stores
           setFlag(MOCK_OWNED_KEY, JSON.stringify([...o, id]));
         }
         lastFailure = null;
+        lastTransaction = record(id).txn;
         d.track?.('purchase', { product: id, store: 'mock' });
         return 'purchased';
       } finally { busy = false; }
     },
     async restore() {
       await sleep(Math.min(delay, 400));
+      if (flag(MOCK_BUY_KEY) === 'fail') throw new Error('mock store unreachable');
       return owned();
     },
   };
@@ -142,10 +171,12 @@ function disabledPurchases(os: NativeOs): Purchases {
   return {
     mode: 'disabled',
     lastFailure: 'notConfigured',
+    lastTransaction: null,
+    onTransactions() {},
     async init() { log.warn(why); },
-    async products() { return fallbackList(); },
+    async products() { return unavailableList(); },
     async buy(id) { log.warn(`buy ${id} failed:`, why); return 'failed'; },
-    async restore() { log.warn('restore:', why); return []; },
+    async restore() { log.warn('restore:', why); throw new Error(why); },
   };
 }
 
@@ -153,32 +184,46 @@ function disabledPurchases(os: NativeOs): Purchases {
 
 function revenueCatPurchases(d: PurchasesDeps, os: NativeOs, apiKey: string): Purchases {
   let b: PurchasesBridge | null = null, initP: Promise<void> | null = null, cached: Product[] | null = null;
-  let busy = false, lastFailure: PurchaseFailure | null = null;
+  let busy = false, lastFailure: PurchaseFailure | null = null, lastTransaction: string | null = null;
   const storeIds = PRODUCT_ORDER.map(id => storeIdFor(os, id));
+  const listeners: ((l: StoreTransaction[]) => void)[] = [];
+  const report = (info: CustomerInfoLike) => {
+    const list = transactionsOf(os, info);
+    for (const f of listeners) { try { f(list); } catch (e) { log.warn('transactions listener failed', errText(e)); } }
+  };
+  /** Ask the store for the latest purchases (start-up, resume): late approvals arrive this way too. */
+  const refresh = () => { if (b) void withTimeout(b.customerInfo(), 10_000, null).then(i => { if (i) report(i); }, () => {}); };
 
   const init = () => (initP ??= (async () => {
     try {
       const bridge = await (d.bridge ?? (() => loadRevenueCatBridge()))();
       await bridge.configure(apiKey);
       b = bridge;
+      bridge.onCustomerInfo(report);
       log.info('RevenueCat configured');
+      refresh();
     } catch (e) { log.warn('RevenueCat configure failed', errText(e)); }
   })());
+  d.onResume?.(refresh);
 
   return {
     mode: 'revenuecat',
     get lastFailure() { return lastFailure; },
+    get lastTransaction() { return lastTransaction; },
+    onTransactions(cb) { listeners.push(cb); },
     init,
     async products() {
       await init();
       if (cached) return cached.map(p => ({ ...p }));
-      if (!b) return fallbackList();
+      if (!b) return unavailableList();
       const store = await withTimeout(b.getProducts(storeIds), 8000, null);
-      if (!store?.length) { log.warn('the store returned no products; showing fallback prices'); return fallbackList(); }
+      // not cached: the next shop visit asks the store again
+      if (!store?.length) { log.warn('the store returned no products'); return unavailableList(); }
       const missing = PRODUCT_ORDER.filter(id => !store.some(p => productIdForStore(os, p.identifier) === id));
       if (missing.length) log.warn('not in the store yet:', missing.join(', '));
-      cached = mergeProducts(os, store);
-      return cached.map(p => ({ ...p }));
+      const list = mergeProducts(os, store);
+      if (!missing.length) cached = list;
+      return list.map(p => ({ ...p }));
     },
     async buy(id) {
       if (busy) { lastFailure = 'busy'; return 'cancelled'; } // a second tap must not start a second payment
@@ -192,10 +237,12 @@ function revenueCatPurchases(d: PurchasesDeps, os: NativeOs, apiKey: string): Pu
           const info = await withTimeout(b.customerInfo(), 5000, null);
           if (info && ownedFromCustomerInfo(os, info).includes(id)) { lastFailure = 'alreadyOwned'; log.info(`${id} already owned: use Restore`); return 'failed'; }
         }
+        lastTransaction = null;
         const r = await b.purchase(storeIdFor(os, id));
         const got = productIdForStore(os, r.productIdentifier);
         if (got !== id) log.warn(`asked for ${id}, the store reported ${r.productIdentifier}`);
         lastFailure = null;
+        lastTransaction = r.transactionId ?? null;
         d.track?.('purchase', { product: id, store: os });
         return 'purchased';
       } catch (e) {
@@ -206,12 +253,14 @@ function revenueCatPurchases(d: PurchasesDeps, os: NativeOs, apiKey: string): Pu
     },
     async restore() {
       await init();
-      if (!b) return [];
+      if (!b) throw new Error('the store is not available');
       try {
-        const owned = ownedFromCustomerInfo(os, await b.restore());
+        const info = await b.restore();
+        const owned = ownedFromCustomerInfo(os, info);
         log.info('restored', owned);
+        report(info);
         return owned;
-      } catch (e) { log.warn('restore failed', errText(e)); return []; }
+      } catch (e) { log.warn('restore failed', errText(e)); throw e; }
     },
   };
 }
@@ -237,9 +286,10 @@ export async function loadRevenueCatBridge(): Promise<PurchasesBridge> {
       const product = cache.get(storeId) ?? (await fetch([storeId])).find(p => p.identifier === storeId);
       if (!product) throw new Error(`product "${storeId}" is not available in the store`);
       const r = await Purchases.purchaseStoreProduct({ product });
-      return { productIdentifier: r.productIdentifier };
+      return { productIdentifier: r.productIdentifier, transactionId: r.transaction?.transactionIdentifier };
     },
     restore: async () => (await Purchases.restorePurchases()).customerInfo,
     customerInfo: async () => (await Purchases.getCustomerInfo()).customerInfo,
+    onCustomerInfo(cb) { void Purchases.addCustomerInfoUpdateListener(info => cb(info)); },
   };
 }

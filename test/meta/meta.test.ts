@@ -270,6 +270,48 @@ describe('lives', () => {
   });
 });
 
+describe('attempts', () => {
+  it('an app closed during an attempt spends that life at the next launch, once', async () => {
+    const { m, s } = await setup();
+    m.beginAttempt(3);
+    await m.save();
+    const next = await reopen(s, T0 + MIN);
+    expect(next.lives(T0 + MIN).lives).toBe(4);
+    expect(next.snapshot().attempt).toBeNull();
+    await next.save();
+    expect((await reopen(s, T0 + 2 * MIN)).lives(T0 + 2 * MIN).lives).toBe(4);
+  });
+
+  it('a finished attempt costs nothing at the next launch', async () => {
+    const { m, s } = await setup();
+    m.beginAttempt(3);
+    m.endAttempt();
+    await m.save();
+    expect((await reopen(s, T0 + MIN)).lives(T0 + MIN).lives).toBe(5);
+  });
+});
+
+describe('late purchases', () => {
+  it('delivers a pending purchase once when its transaction shows up, and forgets old ones', async () => {
+    const { m } = await setup();
+    m.notePendingPurchase('coins_basket', T0);
+    m.notePendingPurchase('coins_jar', T0 - 20 * 24 * HOUR);
+    expect(m.settlePurchases([{ id: 'coins_basket', txn: 'old', at: T0 - HOUR }], T0)).toEqual([]); // bought long before
+    const got = m.settlePurchases([{ id: 'coins_basket', txn: 'A', at: T0 + 5 * MIN }, { id: 'coins_jar', txn: 'B', at: T0 }], T0 + 6 * MIN);
+    expect(got).toEqual([{ id: 'coins_basket', reward: { coins: 5500 } }]); // the jar wait expired
+    expect(m.coins).toBe(300 + 5500);
+    expect(m.settlePurchases([{ id: 'coins_basket', txn: 'A', at: T0 + 5 * MIN }], T0 + 7 * MIN)).toEqual([]);
+    expect(m.snapshot().pending).toEqual([]);
+  });
+
+  it('never applies the same store transaction twice', async () => {
+    const { m } = await setup();
+    expect(m.applyPurchase('coins_pouch', 'X1')).toEqual({ coins: 1000 });
+    expect(m.applyPurchase('coins_pouch', 'X1')).toEqual({});
+    expect(m.coins).toBe(1300);
+  });
+});
+
 describe('unlimited lives', () => {
   it('make spending free until they run out', async () => {
     const { m } = await setup();
@@ -483,13 +525,16 @@ describe('daily gift', () => {
     expect(m.dailyGift(at(27, 23, 30)).day).toBe(4);
   });
 
-  it('doubles coins only when doubled', async () => {
+  it('the video doubles the whole gift: coins, boosters and unlimited-lives time', async () => {
     const { m } = await setup(at(1));
     expect(m.claimDailyGift(at(1), true)).toEqual({ coins: 100 });
     m.claimDailyGift(at(2), false);
-    expect(m.claimDailyGift(at(3), true)).toEqual({ boosters: { shuffle: 1 } });
-    expect(m.boosterCount('shuffle')).toBe(1);
+    expect(m.claimDailyGift(at(3), true)).toEqual({ boosters: { shuffle: 2 } });
+    expect(m.boosterCount('shuffle')).toBe(2);
     expect(m.coins).toBe(300 + 100 + 75);
+    for (let d = 4; d <= 6; d++) m.claimDailyGift(at(d), false);
+    expect(m.claimDailyGift(at(7, 9), true)).toEqual({ coins: 500, unlimitedLivesMin: 60 });
+    expect(m.lives(at(7, 9, 59)).unlimitedUntil).not.toBeNull();
   });
 
   it('does not pay out again when the clock is moved back', async () => {

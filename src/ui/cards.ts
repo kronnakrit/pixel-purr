@@ -1,5 +1,5 @@
 // Every card modal: intro, booster unlock, win, fail, pause/settings, daily gift, out of lives, offers, buy booster.
-import type { BoosterKey, FailInfo, IntroKey, LivesInfo, OfferInfo, Reward, Settings, WinInfo } from '../app/contracts';
+import type { BoosterKey, FailInfo, IntroKey, LivesInfo, OfferInfo, PauseOptions, Reward, Settings, WinInfo } from '../app/contracts';
 import { PALETTE } from '../engine/palette';
 import { ICONS, boosterArt, check, coin, coinPile, flame, hand, heart, infinity, linked, pictureCanvas, purrlet, tray, videoGlyph } from './art';
 import { BOOSTER_INFO } from './boosters';
@@ -127,7 +127,7 @@ export function failCard(m: Modals, f: FailInfo): Promise<'coins' | 'video' | 'g
 
 // ---------------------------------------------------------------- pause / settings
 
-export function pauseCard(m: Modals, ctx: Ctx, mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void, privacy?: () => void): Promise<'resume' | 'restart' | 'home'> {
+export function pauseCard(m: Modals, ctx: Ctx, mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void, opts: PauseOptions = {}): Promise<'resume' | 'restart' | 'home'> {
   const cur = { ...s };
   const sysRM = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   return m.show<'resume' | 'restart' | 'home'>({
@@ -161,7 +161,11 @@ export function pauseCard(m: Modals, ctx: Ctx, mode: 'play' | 'home', s: Setting
       }
       p.body.append(actions(pill(mode === 'play' ? 'Resume' : 'Done', 'green', () => done('resume'), { cls: 'pp-primary' })));
       // ad consent rules: the player must be able to change their choices at any time
-      if (privacy) p.body.append(linkBtn('Privacy choices', () => { ctx.sfx('button'); privacy(); }, 'pp-privacy'));
+      const links = [
+        opts.policy ? linkBtn('Privacy policy', () => { ctx.sfx('button'); opts.policy?.(); }, 'pp-privacy') : null,
+        opts.privacy ? linkBtn('Privacy choices', () => { ctx.sfx('button'); opts.privacy?.(); }, 'pp-privacy') : null,
+      ].filter((x): x is HTMLButtonElement => !!x);
+      if (links.length) p.body.append(h('div', 'pp-legal', ...links));
       return p.el;
     },
   });

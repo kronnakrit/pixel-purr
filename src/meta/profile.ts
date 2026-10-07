@@ -33,7 +33,17 @@ export interface Profile {
   ads: { count: number; lastAt: number | null; removeAdsOffered: boolean };
   starterOffered: boolean;
   settings: Settings;
+  /** Level of the attempt in progress, if the app was closed during one (costs a life at the next launch). */
+  attempt: number | null;
+  /** Purchases that did not complete in the app and may still go through in the store. */
+  pending: { id: ProductId; at: number }[];
+  /** Store transaction ids already delivered (latest DELIVERED_KEEP), so a transaction never pays twice. */
+  delivered: string[];
 }
+
+export const DELIVERED_KEEP = 200;
+/** How long a pending purchase is still delivered when the store reports it. */
+export const PENDING_DAYS = 14;
 
 export function freshProfile(now: number, e: EconomyConfig): Profile {
   return {
@@ -53,6 +63,9 @@ export function freshProfile(now: number, e: EconomyConfig): Profile {
     ads: { count: 0, lastAt: null, removeAdsOffered: false },
     starterOffered: false,
     settings: { ...DEFAULT_SETTINGS },
+    attempt: null,
+    pending: [],
+    delivered: [],
   };
 }
 
@@ -97,6 +110,11 @@ export function repairProfile(raw: unknown, now: number, e: EconomyConfig): Prof
   p.ads = { count: num(a.count, 0), lastAt: time(a.lastAt), removeAdsOffered: bool(a.removeAdsOffered, false) };
   p.starterOffered = bool(raw.starterOffered, false);
   p.settings = cleanSettings(raw.settings);
+  p.attempt = Number.isInteger(raw.attempt) && (raw.attempt as number) >= 1 ? raw.attempt as number : null;
+  p.pending = (Array.isArray(raw.pending) ? raw.pending : [])
+    .filter((x): x is { id: ProductId; at: number } => isObj(x) && isProductId(x.id) && time(x.at) !== null)
+    .map(x => ({ id: x.id, at: x.at }));
+  p.delivered = keys(raw.delivered, (x): x is string => typeof x === 'string' && x.length > 0).slice(-DELIVERED_KEEP);
   // Stickers prove progress: never let the next level fall behind the highest clear.
   const top = p.stickers[p.stickers.length - 1];
   if (top !== undefined) p.level = Math.max(p.level, top + 1);

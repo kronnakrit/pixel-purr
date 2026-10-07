@@ -47,6 +47,16 @@ function fileLevel(n: number): Level {
   return L;
 }
 
+/** The level that introduces mystery Purrlets must have one, even when the generator's low early rate dealt none. */
+export function ensureMystery(L: Level): Level {
+  if (L.queues.some(q => q.some(p => p.hidden))) return L;
+  // the deepest unlinked Purrlet of the longest queue: it is revealed late, so the player sees the grey pot for a while
+  let pick: Level['queues'][number][number] | undefined;
+  for (const q of L.queues) for (const p of q) if (p.d > 0 && p.link === undefined && (!pick || p.d > pick.d)) pick = p;
+  if (pick) pick.hidden = true;
+  return L;
+}
+
 const levels = new Map<number, Level>(), pictures = new Map<number, Picture>();
 
 function check(n: number): void {
@@ -61,6 +71,7 @@ export const content: ContentApi = {
     let L = levels.get(n);
     if (!L) {
       L = n >= FIRST_FILE_LEVEL && n <= LAST_FILE_LEVEL ? fileLevel(n) : level(n);
+      if (INTROS[n] === 'mystery') ensureMystery(L); // hiding a colour never changes the solution
       levels.set(n, L);
     }
     return L;

@@ -207,17 +207,20 @@ export const QUEUE_SHOWN = 3;
 /** What a tap at (x, y) hits: a tray cushion holding a cat, or anywhere on a queue column with cats. */
 export function hitTest(L: Layout, x: number, y: number, queueLens: readonly number[], trayN: number, cushions: number): TapTarget | null {
   const T = trayLayout(L, cushions);
-  if (trayN > 0 && y >= T.panel.y - 0.2 * T.cs && y <= T.panel.y + T.panel.h + 0.1 * T.cs) {
+  const inTray = trayN > 0 && y >= T.panel.y - 0.2 * T.cs && y <= T.panel.y + T.panel.h + 0.1 * T.cs;
+  const tray = (): TapTarget | null => {
     let best = -1, bd = Infinity;
     for (let i = 0; i < Math.min(trayN, T.xs.length); i++) { const d = Math.abs(x - T.xs[i]!); if (d < bd) { bd = d; best = i; } }
-    if (best >= 0 && bd <= T.cs * 0.6) return { kind: 'tray', i: best };
-    return null;
-  }
+    return best >= 0 && bd <= T.cs * 0.6 ? { kind: 'tray', i: best } : null;
+  };
+  // Below the tray panel, the queue cats' ears come first: on short phones the two areas overlap there.
+  if (inTray && y <= T.panel.y + T.panel.h) return tray();
   const qTop = L.queue.y - 0.04 * L.col.w, qBot = Math.max(L.queue.y + L.queue.h, queueCatY(L, 2)) + 0.04 * L.col.w;
-  if (y < qTop || y > qBot) return null;
-  const xs = queueXs(L, queueLens.length), half = queuePitch(L, queueLens.length) / 2;
-  for (let q = 0; q < xs.length; q++) if (Math.abs(x - xs[q]!) <= half && (queueLens[q] ?? 0) > 0) return { kind: 'queue', q };
-  return null;
+  if (y >= qTop && y <= qBot) {
+    const xs = queueXs(L, queueLens.length), half = queuePitch(L, queueLens.length) / 2;
+    for (let q = 0; q < xs.length; q++) if (Math.abs(x - xs[q]!) <= half && (queueLens[q] ?? 0) > 0) return { kind: 'queue', q };
+  }
+  return inTray ? tray() : null;
 }
 
 // ---------------------------------------------------------------- win

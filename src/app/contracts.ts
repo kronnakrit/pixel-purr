@@ -110,6 +110,10 @@ export interface MetaApi {
   refillLives(now: number): void;
   /** Extra lives (the rewarded 'lives' video). Never above max; a no-op with unlimited lives. */
   addLives(n: number, now: number): void;
+  /** An attempt at level n is live. If the app dies before endAttempt, the next launch spends the life
+   *  (closing the app is not a free way out of a lost level). */
+  beginAttempt(n: number): void;
+  endAttempt(): void;
   grantUnlimitedLives(minutes: number, now: number): void;
 
   boosterCount(k: BoosterKey): number;
@@ -126,15 +130,20 @@ export interface MetaApi {
   markIntroSeen(k: IntroKey): void;
 
   dailyGift(now: number): { available: boolean; day: number; reward: Reward };
-  /** Claims today's gift (doubled when the player watched a video) and returns what was granted. */
+  /** Claims today's gift (all of it doubled when the player watched a video) and returns what was granted. */
   claimDailyGift(now: number, doubled: boolean): Reward;
 
   grant(r: Reward, reason: string): void;
   readonly removeAds: boolean;
   /** One-time products already bought. */
   owns(id: ProductId): boolean;
-  /** Apply a completed purchase's contents. */
-  applyPurchase(id: ProductId): Reward;
+  /** Apply a completed purchase's contents. With the store's transaction id, the same transaction never pays twice. */
+  applyPurchase(id: ProductId, txn?: string | null): Reward;
+  /** A purchase that did not complete in the app may still go through later (Ask to Buy, slow payments, a
+   *  network error after paying). settlePurchases delivers it when the store reports the transaction. */
+  notePendingPurchase(id: ProductId, now: number): void;
+  /** Deliver pending purchases the store now reports. Returns what was delivered. */
+  settlePurchases(list: readonly StoreTransaction[], now: number): { id: ProductId; reward: Reward }[];
   /** Restore a one-time product's lasting part (Remove Ads) without granting its coins or boosters again. */
   restorePurchase(id: ProductId): Reward;
 
@@ -176,11 +185,20 @@ export interface PurchasesApi {
   init(): Promise<void>;
   products(): Promise<Product[]>;
   buy(id: ProductId): Promise<'purchased' | 'cancelled' | 'failed'>;
-  /** Restores non-consumables (Remove Ads, Cosy Bundle). Returns what was restored. */
+  /** Restores non-consumables (Remove Ads, Cosy Bundle). Returns what was restored; rejects when the store
+   *  can't be reached (so the player isn't told they own nothing). */
   restore(): Promise<ProductId[]>;
   /** Why the last buy() did not complete, for the toast; null after a success. */
   readonly lastFailure: PurchaseFailure | null;
+  /** The store's transaction id of the last successful buy(), when it gives one. */
+  readonly lastTransaction: string | null;
+  /** Every one-off purchase the store knows about: after start-up, on resume and whenever the store reports a
+   *  change. The app delivers the ones it was still waiting for (see MetaApi.settlePurchases). */
+  onTransactions(cb: (list: StoreTransaction[]) => void): void;
 }
+
+/** A store transaction: product, the store's transaction id and when it was bought (ms since epoch). */
+export interface StoreTransaction { id: ProductId; txn: string; at: number }
 
 export type PurchaseFailure = 'cancelled' | 'busy' | 'alreadyOwned' | 'pending' | 'notConfigured' | 'unavailable' | 'store';
 
@@ -203,6 +221,8 @@ export interface PlatformApi {
   onPause(cb: (paused: boolean) => void): void;
   /** Android back button. Return true when handled. */
   onBack(cb: () => boolean): void;
+  /** Open a web page in the system browser (the privacy policy). */
+  openUrl(url: string): void;
 }
 
 // ---------------------------------------------------------------- audio (src/audio)
@@ -283,7 +303,20 @@ export type HomeChoice = 'play' | 'shop' | 'stickers' | 'daily' | 'settings';
 
 export interface WinInfo { level: number; name: string; picture: Picture; coins: number; canDouble: boolean }
 export interface FailInfo { level: number; continueCost: number; canAfford: boolean; videoReady: boolean; canContinue: boolean }
-export interface ShopState { coins: number; products: Product[]; owned: ProductId[]; videoReady: boolean; rewards: Record<ProductId, Reward> }
+/** A product whose price is '' is not available from the store right now. removeAds: the player has no ads already
+ *  (Remove Ads or the Cosy Bundle), so Remove Ads is not for sale. videoCoins: what the shop's video gives. */
+export interface ShopState {
+  coins: number; products: Product[]; owned: ProductId[]; removeAds: boolean; videoReady: boolean; videoCoins: number;
+  rewards: Record<ProductId, Reward>;
+}
+export interface ShopActions {
+  buy(id: ProductId): Promise<boolean>;
+  video(): Promise<boolean>;
+  /** Resolves with the restored products. */
+  restore(): Promise<ProductId[]>;
+  /** Asked again while the shop is open: a video can stop or start being available. */
+  videoReady(): boolean;
+}
 export interface OfferInfo { kind: 'starter' | 'removeAds'; product: Product | null; reward: Reward }
 
 export interface HudApi {
@@ -306,6 +339,10 @@ export interface HudApi {
   onLivesDue(cb: () => void): void;
 }
 
+/** Links on the pause / settings card: the privacy policy (always), and ad "Privacy choices" where the consent
+ *  rules require them. */
+export interface PauseOptions { policy?: () => void; privacy?: () => void }
+
 export interface UiApi {
   mount(root: HTMLElement): void;
   readonly hud: HudApi;
@@ -315,8 +352,8 @@ export interface UiApi {
   win(w: WinInfo): Promise<'continue' | 'double'>;
   fail(f: FailInfo): Promise<'coins' | 'video' | 'giveup'>;
   /** In-game pause (mode 'play': resume/restart/home) or settings from home (mode 'home': close only). */
-  pause(mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void, opts?: { privacy?: () => void }): Promise<'resume' | 'restart' | 'home'>;
-  shop(s: ShopState, actions: { buy(id: ProductId): Promise<boolean>; video(): Promise<boolean>; restore(): Promise<void> }): Promise<void>;
+  pause(mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void, opts?: PauseOptions): Promise<'resume' | 'restart' | 'home'>;
+  shop(s: ShopState, actions: ShopActions): Promise<void>;
   stickerBook(items: { n: number; name: string; picture: Picture }[]): Promise<void>;
   dailyGift(g: { day: number; reward: Reward; videoReady: boolean }): Promise<'claim' | 'double'>;
   outOfLives(l: LivesInfo, refillCost: number, canAfford: boolean, videoReady: boolean): Promise<'coins' | 'video' | 'close'>;

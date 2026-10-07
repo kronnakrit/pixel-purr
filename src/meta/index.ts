@@ -3,9 +3,10 @@
 // keep working while the app is closed: lives and gifts are computed from stored timestamps, never from timers.
 import {
   BOOSTER_KEYS, type BoosterKey, type IntroKey, type LivesInfo, type MetaApi, type ProductId, type Reward, type Settings,
+  type StoreTransaction,
 } from '../app/contracts';
 import { cleanReward, copyReward, mergeEconomy, PRODUCTS, unlockOrder, type EconomyOverrides } from './economy';
-import { cleanSettings, localDay, PROFILE_KEY, repairProfile, type Profile } from './profile';
+import { cleanSettings, DELIVERED_KEEP, localDay, PENDING_DAYS, PROFILE_KEY, repairProfile, type Profile } from './profile';
 import { preferencesStorage, type MetaStorage } from './storage';
 
 export { DEFAULT_ECONOMY, PRODUCTS, PRODUCT_IDS, mergeEconomy, type EconomyOverrides } from './economy';
@@ -27,7 +28,7 @@ export interface Meta extends MetaApi {
   snapshot(): Profile;
   /** `now` defaults to the clock; it only matters for unlimited-lives rewards. */
   grant(r: Reward, reason: string, now?: number): void;
-  applyPurchase(id: ProductId, now?: number): Reward;
+  applyPurchase(id: ProductId, txn?: string | null, now?: number): Reward;
 }
 
 /**
@@ -164,6 +165,16 @@ export async function loadMeta(now: number, economy?: EconomyOverrides, storage:
       return { lives: l.lives, max: e.maxLives, nextInMs: l.next, unlimitedUntil: unlimited(now) ? p.unlimitedUntil : null };
     },
     hasLife(now: number) { return unlimited(now) || livesNow(now).lives > 0; },
+    beginAttempt(n: number) {
+      if (p.attempt === n) return;
+      p.attempt = n;
+      changed('attempt');
+    },
+    endAttempt() {
+      if (p.attempt === null) return;
+      p.attempt = null;
+      changed('attempt:end');
+    },
     spendLife(now: number) {
       if (unlimited(now)) return;
       settleLives(now);
@@ -233,7 +244,11 @@ export async function loadMeta(now: number, economy?: EconomyOverrides, storage:
       const g = daily(now);
       if (!g.available) return {};
       const r = g.reward;
-      if (doubled && r.coins) r.coins *= 2; // the video doubles coins; boosters and lives stay as they are
+      if (doubled) { // the video doubles everything in the gift
+        if (r.coins) r.coins *= 2;
+        if (r.boosters) for (const k of BOOSTER_KEYS) if (r.boosters[k]) r.boosters[k] *= 2;
+        if (r.unlimitedLivesMin) r.unlimitedLivesMin *= 2;
+      }
       p.daily = { lastDay: g.today, streak: g.streak };
       addReward(r, now);
       changed('coins:daily');
@@ -247,9 +262,14 @@ export async function loadMeta(now: number, economy?: EconomyOverrides, storage:
     },
     get removeAds() { return p.removeAds; },
     owns: (id: ProductId) => p.owned.includes(id),
-    applyPurchase(id: ProductId, now: number = Date.now()) {
+    applyPurchase(id: ProductId, txn?: string | null, now: number = Date.now()) {
       const prod = PRODUCTS[id];
       if (!prod) return {}; // unknown id from a store callback
+      if (txn) {
+        if (p.delivered.includes(txn)) return {};
+        p.delivered = [...p.delivered, txn].slice(-DELIVERED_KEEP);
+      }
+      p.pending = p.pending.filter(x => x.id !== id); // it went through after all
       // A one-time product delivered again (store retry, restore on the same device) never pays out twice.
       if (prod.oneTime && p.owned.includes(id)) return restoreOneTime(id);
       if (prod.oneTime) p.owned.push(id);
@@ -259,6 +279,25 @@ export async function loadMeta(now: number, economy?: EconomyOverrides, storage:
       return r;
     },
     restorePurchase: restoreOneTime,
+    notePendingPurchase(id: ProductId, now: number) {
+      if (!PRODUCTS[id] || p.pending.some(x => x.id === id)) return;
+      p.pending.push({ id, at: now });
+      changed('purchase:pending');
+    },
+    settlePurchases(list: readonly StoreTransaction[], now: number) {
+      const out: { id: ProductId; reward: Reward }[] = [];
+      const keep = now - PENDING_DAYS * 86_400_000;
+      const before = p.pending.length;
+      p.pending = p.pending.filter(x => x.at >= keep);
+      for (const w of [...p.pending]) {
+        // a transaction for that product, from about when the player tried (store clocks differ a little)
+        const t = list.find(x => x.id === w.id && x.at >= w.at - 10 * 60_000 && !p.delivered.includes(x.txn));
+        if (!t) continue;
+        out.push({ id: w.id, reward: meta.applyPurchase(w.id, t.txn, now) });
+      }
+      if (!out.length && p.pending.length !== before) changed('purchase:expired');
+      return out;
+    },
 
     mayShowInterstitial({ level, afterLoss, now }) {
       if (p.removeAds || afterLoss || level < e.interstitial.fromLevel) return false;
@@ -287,5 +326,10 @@ export async function loadMeta(now: number, economy?: EconomyOverrides, storage:
     onChange(cb) { listeners.add(cb); return () => { listeners.delete(cb); }; },
     snapshot: () => JSON.parse(JSON.stringify(p)) as Profile,
   };
+  // The app was closed during an attempt: that counts as leaving the level, which costs a life.
+  if (p.attempt !== null) {
+    meta.spendLife(now);
+    meta.endAttempt();
+  }
   return meta;
 }

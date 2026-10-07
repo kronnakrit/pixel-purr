@@ -1,5 +1,5 @@
 // Full-screen pages: the shop and the Sticker Book. They carry their own header (back, title, coin chip).
-import type { ProductId, ShopState } from '../app/contracts';
+import type { ProductId, ShopActions, ShopState } from '../app/contracts';
 import type { Picture } from '../engine/picture';
 import { BOOSTER_KEYS } from '../app/contracts';
 import { boosterArt, coinPile, pictureCanvas, purrlet, star, videoGlyph } from './art';
@@ -17,15 +17,14 @@ const PACKS: readonly { id: ProductId; name: string; coins: number }[] = [
 ];
 const ONE_TIME: readonly ProductId[] = ['cosy_bundle', 'starter_bundle', 'remove_ads'];
 
-export interface ShopActions { buy(id: ProductId): Promise<boolean>; video(): Promise<boolean>; restore(): Promise<void> }
-
 export function shopPage(m: Modals, ctx: Ctx, s: ShopState, act: ShopActions): Promise<void> {
   const owned = new Set<ProductId>(s.owned);
-  let busy = false;
+  let busy = false, noAds = s.removeAds, videoReady = s.videoReady;
   return m.show<void>({
     label: 'Shop', kind: 'page', back: done => { if (!busy) done(); },
     build: done => {
-      const price = (id: ProductId) => s.products.find(p => p.id === id)?.price ?? null;
+      // '' = the store has no price for it right now: not for sale
+      const price = (id: ProductId) => s.products.find(p => p.id === id)?.price || null;
       const buttons: { b: HTMLButtonElement; id: ProductId | null }[] = [];
 
       // one button per product; owned one-time products show "Owned"
@@ -54,31 +53,38 @@ export function shopPage(m: Modals, ctx: Ctx, s: ShopState, act: ShopActions): P
       if (s.products.some(p => p.id === 'remove_ads')) {
         extra.push(h('div', 'pp-shoprow', h('div', 'pp-shoprow-l', otext('Remove Ads', 'pp-pack-t', 'h3'), h('p', 'pp-sub', 'Optional videos stay')), buyBtn('remove_ads', 's')));
       }
-      const video = pill('Free coins with video', 'blue', () => void runVideo(), { size: 'm', icon: videoGlyph(28), disabled: !s.videoReady });
-      const restore = linkBtn('Restore purchases', () => void runRestore());
+      const video = pill(`+${formatNumber(s.videoCoins)} coins with video`, 'blue', () => void runVideo(), { size: 'm', icon: videoGlyph(28), disabled: !videoReady });
+      const noVideo = h('p', 'pp-note', 'No video right now');
+      // Restore sits at the top, where it is seen without scrolling (the stores ask for it to be easy to find)
+      const restore = linkBtn('Restore purchases', () => void runRestore(), 'pp-restore');
       const spinner = h('div', 'pp-spin-wrap', h('div', 'pp-spin'), h('p', 'pp-sub', 'One moment…'));
       spinner.setAttribute('role', 'status');
 
-      const body = h('div', 'pp-pbody', bundle, packs, ...extra, h('div', 'pp-actions', video, s.videoReady ? null : h('p', 'pp-note', 'No video right now'), restore));
+      const body = h('div', 'pp-pbody', h('div', 'pp-restore-row', restore), bundle, packs, ...extra, h('div', 'pp-actions', video, noVideo));
       const page = h('div', 'pp-pagebox', pageHead(ctx, 'Shop', () => { if (!busy) done(); }), body, spinner);
 
       function sync() {
+        videoReady = act.videoReady();
         for (const { b, id } of buttons) {
           if (!id) continue;
-          const has = ONE_TIME.includes(id) && owned.has(id);
+          // Remove Ads is part of the Cosy Bundle: never sell it to someone who has no ads already
+          const has = ONE_TIME.includes(id) && (owned.has(id) || (id === 'remove_ads' && noAds));
           b.classList.toggle('pp-owned', has);
           const t = b.querySelector('.pp-pill-t');
           if (t) t.textContent = has ? 'Owned' : price(id) ?? '—';
           setDisabled(b, busy || has || !price(id));
         }
-        setDisabled(video, busy || !s.videoReady);
+        setDisabled(video, busy || !videoReady);
+        noVideo.hidden = videoReady;
         setDisabled(restore, busy);
         page.classList.toggle('pp-isbusy', busy);
       }
       async function run(id: ProductId) {
         if (busy) return;
         busy = true; sync();
-        try { if (await act.buy(id) && ONE_TIME.includes(id)) owned.add(id); } catch { /* the controller reports failures */ }
+        try {
+          if (await act.buy(id) && ONE_TIME.includes(id)) { owned.add(id); if (s.rewards[id]?.removeAds) noAds = true; }
+        } catch { /* the controller reports failures */ }
         busy = false; sync();
       }
       async function runVideo() {
@@ -90,10 +96,14 @@ export function shopPage(m: Modals, ctx: Ctx, s: ShopState, act: ShopActions): P
       async function runRestore() {
         if (busy) return;
         busy = true; sync();
-        try { await act.restore(); } catch { /* reported by the controller */ }
+        try {
+          for (const id of await act.restore()) { owned.add(id); if (s.rewards[id]?.removeAds) noAds = true; }
+        } catch { /* reported by the controller */ }
         busy = false; sync();
       }
       sync();
+      // a video can become available (or run out) while the shop is open
+      const poll = setInterval(() => { if (!page.isConnected) clearInterval(poll); else if (!busy && act.videoReady() !== videoReady) sync(); }, 1000);
       return page;
     },
   });

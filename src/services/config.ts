@@ -68,9 +68,11 @@ export const PRODUCT_ORDER: readonly ProductId[] = [
 
 /**
  * One-time products: "Non-Consumable" in App Store Connect, and marked non-consumable for the Play product in
- * RevenueCat (RevenueCat consumes Play one-time products unless told otherwise). Coin packs are consumables.
+ * RevenueCat (RevenueCat consumes Play one-time products unless told otherwise). They are the products with a
+ * lasting part (no ads) that Restore can bring back. Coin packs and the Starter Bundle (coins and boosters only) are
+ * consumables; the game itself offers the Starter Bundle only once.
  */
-export const ONE_TIME_PRODUCTS: readonly ProductId[] = ['cosy_bundle', 'starter_bundle', 'remove_ads'];
+export const ONE_TIME_PRODUCTS: readonly ProductId[] = ['cosy_bundle', 'remove_ads'];
 
 const sameIds = (): Record<ProductId, string> =>
   Object.fromEntries(PRODUCT_ORDER.map(id => [id, id])) as Record<ProductId, string>;
@@ -97,6 +99,16 @@ export const FALLBACK_PRODUCTS: readonly Product[] = [
   { id: 'starter_bundle', title: 'Starter Bundle', description: '2,500 coins + 2 of each booster', price: '$1.99' },
   { id: 'remove_ads', title: 'Remove Ads', description: 'No more ads between levels. Optional videos stay.', price: '$3.99' },
 ];
+
+// ---------------------------------------------------------------- legal
+
+export const LEGAL = {
+  /**
+   * REPLACE BEFORE RELEASE if you host it elsewhere: the privacy policy page (docs/privacy.html). Both stores ask for
+   * a link inside the app. This address works once GitHub Pages is on for the repo (Settings → Pages → main, /docs).
+   */
+  privacyPolicyUrl: 'https://kronnakrit.github.io/pixel-purr/privacy.html',
+};
 
 // ---------------------------------------------------------------- remote config
 

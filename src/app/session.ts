@@ -28,6 +28,8 @@ export class Session {
   readonly tutorial: Tutorial | null;
   /** A continue was used this attempt (only one is offered). */
   continued = false;
+  /** Extra Cushion was used this attempt: one per attempt, so a double tap can't spend two. */
+  cushioned = false;
   private phase: 'ready' | 'live' | 'ended' = 'ready';
   /** Open modals and running flows; the clock stops while any is held. */
   private holds = 0;
@@ -97,7 +99,7 @@ export class Session {
   canUse(k: BoosterKey): boolean {
     const g = this.game;
     if (g.status !== 'playing') return false;
-    return k === 'slot' ? true : k === 'shuffle' ? g.canShuffle() : k === 'nap' ? g.canNap() : g.canXray();
+    return k === 'slot' ? !this.cushioned : k === 'shuffle' ? g.canShuffle() : k === 'nap' ? g.canNap() : g.canXray();
   }
 
   /** Booster bar tap: use one from stock, or offer to buy one (coins, or a video for one). */
@@ -130,6 +132,7 @@ export class Session {
 
   private applyBooster(k: BoosterKey, via: string): void {
     const g = this.game;
+    if (k === 'slot') this.cushioned = true;
     const ev = k === 'slot' ? g.addTraySlot() : k === 'shuffle' ? g.shuffleQueues(this.rng) : k === 'nap' ? g.napTray() : g.armXray();
     this.emit(ev);
     this.tutorial?.booster(k);
@@ -191,6 +194,8 @@ export class Session {
     const s = this.game.status;
     if (s === 'playing' || this.flow || this.phase !== 'live') return;
     this.notify(s);
+    // the picture is done: closing the app during the celebration must not cost a life
+    if (s === 'won') this.host.meta.endAttempt();
     if (s === 'won') void this.won();
     else void this.lost();
   }
@@ -239,14 +244,15 @@ export class Session {
       const { coins, firstClear } = meta.completeLevel(n, this.info.spicy, h.now());
       analytics.event('level_win', { level: n, continued: this.continued, firstClear });
       const choice = await h.ask('win', () => ui.win({ level: n, name: this.info.name, picture: content.levelPicture(n), coins, canDouble: ads.rewardedReady() }));
-      let total = coins;
-      if (choice === 'double' && await h.rewarded('doubleCoins')) { meta.addCoins(coins, 'win:double'); total += coins; }
+      let total = coins, watched = false;
+      if (choice === 'double' && await h.rewarded('doubleCoins')) { meta.addCoins(coins, 'win:double'); total += coins; watched = true; }
       h.syncHud(); // the chip counts up as the coins land
       await ui.coinsFly(scene.screenPoint('board') ?? h.center(), total);
       if (meta.takeStarterOfferMoment(n)) await h.offer('starter');
       const afterLoss = h.lostRecently;
       h.lostRecently = false;
-      if (meta.mayShowInterstitial({ level: n, afterLoss, now: h.now() }) && await h.interstitial()) {
+      // never a second full-screen ad right after the player chose to watch one
+      if (!watched && meta.mayShowInterstitial({ level: n, afterLoss, now: h.now() }) && await h.interstitial()) {
         meta.recordInterstitial(h.now());
         if (meta.takeRemoveAdsOfferMoment()) await h.offer('removeAds');
       }

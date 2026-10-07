@@ -111,6 +111,42 @@ describe('boosters', () => {
     g.queues.forEach((q, qi) => q.forEach((p, d) => expect([p.q, p.d]).toEqual([qi, d])));
   });
 
+  it('Yarn Shuffle is only offered when it can change what the player sees, and always changes it', () => {
+    // one waiting Purrlet, or several that look the same: nothing to re-deal
+    expect(new Game(make(ring, [[[C.soda, 8]]])).canShuffle()).toBe(false);
+    expect(new Game(make(ring, [[[C.soda, 4]], [[C.soda, 4]]])).canShuffle()).toBe(false);
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = new Game(make(ring, [[[C.cherry, 1]], [[C.soda, 8]]]));
+      expect(g.canShuffle()).toBe(true);
+      expect(g.shuffleQueues(mulberry32(seed))[0]).toEqual({ type: 'shuffle', order: [[1], [0]] });
+    }
+  });
+
+  it('a revealed mystery Purrlet stays revealed after a shuffle, and is revealed only once', () => {
+    const L = make(ring, [[[C.cherry, 1]], [[C.soda, 4], [C.soda, 4]]]);
+    L.queues[1]![1]!.hidden = true;
+    const g = new Game(L), m = g.purrlet(2)!;
+    expect(g.isRevealed(m)).toBe(false);
+    expect(g.launchQueue(1)).toContainEqual({ type: 'reveal', id: 2 });
+    expect(g.isRevealed(m)).toBe(true);
+    g.settle();
+    let revealed = 0;
+    for (let seed = 1; seed <= 10 && g.canShuffle(); seed++) {
+      revealed += g.shuffleQueues(mulberry32(seed)).filter(e => e.type === 'reveal').length;
+      expect(g.isRevealed(m)).toBe(true);
+    }
+    expect(revealed).toBe(0);
+  });
+
+  it('X-Ray Specs on a linked pair go to the first Purrlet only', () => {
+    const L = make(ring, [[[C.soda, 4]], [[C.soda, 4]], [[C.cherry, 1]]]);
+    L.queues[0]![0]!.link = 1; L.queues[1]![0]!.link = 0;
+    const g = new Game(L);
+    g.armXray();
+    expect(g.launchQueue(0)[0]).toEqual({ type: 'launch', ids: [0, 1], from: 'queue', xray: true });
+    expect(g.riders.map(r => !!r.xray)).toEqual([true, false]);
+  });
+
   it('Cat Nap sends tray Purrlets to the end of the shortest queues', () => {
     const g = new Game(make(ring, [[[C.cherry, 1]], [[C.soda, 8], [C.cherry, 0 + 1]]]));
     g.launchQueue(0); g.settle();

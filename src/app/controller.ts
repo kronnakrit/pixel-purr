@@ -3,8 +3,9 @@
 // contracts, and gets time from injected now() / raf(), so tests drive it headlessly with fakes and a manual clock.
 import type { Level } from '../engine';
 import type {
-  AdsApi, AnalyticsApi, AudioApi, BoosterKey, ContentApi, GameSceneApi, HomeChoice, HomeState, LevelMeta, MetaApi, PlatformApi,
+  AdsApi, AnalyticsApi, AudioApi, BoosterKey, ContentApi, GameSceneApi, HomeChoice, HomeState, LevelMeta, MetaApi, PauseOptions, PlatformApi,
   Point, Product, ProductContents, ProductId, PurchaseFailure, PurchasesApi, RemoteConfigApi, Reward, RewardedPlacement, Settings, ShopState,
+  StoreTransaction,
 } from './contracts';
 import { BOOSTER_KEYS } from './contracts';
 import type { AppUi, SessionHost } from './host';
@@ -59,6 +60,8 @@ export interface AppDeps {
   viewport?(): { w: number; h: number };
   /** Dev: wipe the saved profile; the loader then builds a fresh one. */
   resetProfile?(): Promise<void>;
+  /** The privacy policy page, linked from the settings card. */
+  privacyPolicyUrl?: string;
 }
 
 type HomeCmd = { kind: 'choice'; c: HomeChoice } | { kind: 'play'; n: number } | { kind: 'refresh' };
@@ -95,6 +98,10 @@ export class App implements SessionHost {
   private clearFrames = 0;
   private frameFailed = false;
   private nextLivesTick = 0;
+  /** A home command (shop, daily gift...) is running: HUD taps must not queue a second one. */
+  private homeBusy = false;
+  /** The out-of-lives card was closed because a life arrived while it was open. */
+  private lifeArrived = false;
   private autoNext = false;
   private products: Product[] = [];
   private storeReady: Promise<void> = Promise.resolve();
@@ -131,6 +138,8 @@ export class App implements SessionHost {
     this.m = typeof meta === 'function' ? await meta(isRecord(economy) ? economy : undefined) : meta;
     const rate = remoteConfig.get<unknown>('beltStepsPerSec', DEFAULT_STEPS_PER_SEC);
     this.stepsPerSec = typeof rate === 'number' && rate >= 6 && rate <= 120 ? rate : DEFAULT_STEPS_PER_SEC;
+    // Purchases that went through after the app gave up on them (Ask to Buy, slow payments) arrive here.
+    this.purchases.onTransactions(list => this.settlePurchases(list));
     // Store and ad SDKs start in the background; nothing on the home screen waits for them.
     this.storeReady = Promise.allSettled([this.ads.init(), this.purchases.init()]).then(r => {
       r.forEach(x => { if (x.status === 'rejected') console.warn('app: service init failed', x.reason); });
@@ -157,8 +166,9 @@ export class App implements SessionHost {
     scene.onTap(t => this.session?.tap(t));
     hud.onBooster(k => void this.session?.booster(k));
     // In home mode the real UI routes the gear and the "+" to ui.home(); these cover a UI that doesn't.
-    hud.onPause(() => { if (this.session) void this.session.pause(); else if (this.screen === 'home' && !this.modals.length) this.enqueue({ kind: 'choice', c: 'settings' }); });
-    hud.onShop(() => { if (this.session) void this.session.shop(); else if (this.screen === 'home' && !this.modals.length) this.enqueue({ kind: 'choice', c: 'shop' }); });
+    const idleHome = () => this.screen === 'home' && !this.modals.length && !this.homeBusy;
+    hud.onPause(() => { if (this.session) void this.session.pause(); else if (idleHome()) this.enqueue({ kind: 'choice', c: 'settings' }); });
+    hud.onShop(() => { if (this.session) void this.session.shop(); else if (idleHome()) this.enqueue({ kind: 'choice', c: 'shop' }); });
     hud.onLivesDue(() => this.syncHud());
     ui.onSfx(s => { audio.play(s); if (s === 'button') audio.haptic('light'); });
 
@@ -200,9 +210,15 @@ export class App implements SessionHost {
     if (this.timers.length) this.runTimers();
     const s = this.session;
     s?.advance(dt * this.timeScale);
-    if (this.screen === 'home' && this.time >= this.nextLivesTick) {
+    if (this.time >= this.nextLivesTick) {
       this.nextLivesTick = this.time + 1;
-      this.ui.hud.setLives(this.meta.lives(this.now()));
+      const l = this.meta.lives(this.now());
+      if (this.screen === 'home') this.ui.hud.setLives(l);
+      // a life arrived while the out-of-lives card is up: close it and start the level
+      if (this.modal === 'outOfLives' && (l.lives > 0 || l.unlimitedUntil !== null) && !this.lifeArrived) {
+        this.lifeArrived = true;
+        if (!this.ui.closeTop()) this.lifeArrived = false;
+      }
     }
     // Rendering pauses on the home screen (nothing loaded) and while a full-screen page covers the field.
     if ((s || this.clearFrames > 0) && !this.ui.covered) {
@@ -233,11 +249,12 @@ export class App implements SessionHost {
   private async homeLoop(): Promise<never> {
     for (;;) {
       const cmd = this.queued.shift() ?? (await this.waitHome());
+      this.homeBusy = true;
       try { await this.run(cmd); } catch (e) {
         console.error('app: flow failed', e);
         this.ui.toast('Oops, something went wrong');
         this.leavePlay();
-      }
+      } finally { this.homeBusy = false; }
     }
   }
 
@@ -294,11 +311,13 @@ export class App implements SessionHost {
       for (let attempt = 0; ; attempt++) {
         const s = this.newSession(n, level, attempt);
         if (attempt === 0) await this.levelCards(n, info, s);
+        this.meta.beginAttempt(n); // closing the app from here on counts as leaving the level
         const end = await s.run();
         if (this.session === s) this.session = null;
-        if (end === 'won' || end === 'abort') return;
+        if (end === 'won' || end === 'abort') { this.meta.endAttempt(); return; }
         // giving up, restarting and going home all cost a life
         this.meta.spendLife(this.now());
+        this.meta.endAttempt();
         this.syncHud();
         this.analytics.event('level_quit', { level: n, reason: end });
         if (end !== 'restart' || !(await this.livesGate())) return;
@@ -315,7 +334,9 @@ export class App implements SessionHost {
       const now = this.now(), l = meta.lives(now);
       if (l.lives > 0 || (l.unlimitedUntil !== null && l.unlimitedUntil > now)) return true;
       const cost = meta.economy.refillLivesCost;
+      this.lifeArrived = false;
       const c = await this.ask('outOfLives', () => ui.outOfLives(l, cost, meta.coins >= cost, ads.rewardedReady()));
+      if (c === 'close' && this.lifeArrived) { this.lifeArrived = false; continue; } // a life came in: play
       if (c === 'close') return false;
       if (c === 'coins') {
         if (meta.spendCoins(cost, 'lives')) { meta.refillLives(this.now()); this.syncHud(); this.audio.haptic('success'); }
@@ -387,21 +408,28 @@ export class App implements SessionHost {
   async shop(): Promise<void> {
     const { meta, ui } = this;
     this.analytics.screen('shop');
-    const state: ShopState = {
-      coins: meta.coins, products: await this.productList(), owned: PRODUCT_IDS.filter(id => meta.owns(id)),
-      videoReady: this.ads.rewardedReady(), rewards: this.rewards(),
-    };
-    await this.ask('shop', () => ui.shop(state, {
-      buy: id => this.buy(id),
-      video: async () => {
-        if (!(await this.rewarded('shopCoins'))) return false;
-        meta.addCoins(SHOP_VIDEO_COINS, 'video:shop');
-        this.syncHud();
-        await ui.coinsFly(this.center(), SHOP_VIDEO_COINS);
-        return true;
-      },
-      restore: () => this.restore(),
-    }));
+    // the shop counts as open while prices load, so a second tap can't queue another page
+    await this.ask('shop', async () => {
+      let products: Product[];
+      ui.loading(true);
+      try { products = await this.productList(); } finally { ui.loading(false); }
+      const state: ShopState = {
+        coins: meta.coins, products, owned: PRODUCT_IDS.filter(id => meta.owns(id)), removeAds: meta.removeAds,
+        videoReady: this.ads.rewardedReady(), videoCoins: SHOP_VIDEO_COINS, rewards: this.rewards(),
+      };
+      return ui.shop(state, {
+        buy: id => this.buy(id),
+        video: async () => {
+          if (!(await this.rewarded('shopCoins'))) return false;
+          meta.addCoins(SHOP_VIDEO_COINS, 'video:shop');
+          this.syncHud();
+          await ui.coinsFly(this.center(), SHOP_VIDEO_COINS);
+          return true;
+        },
+        restore: () => this.restore(),
+        videoReady: () => this.ads.rewardedReady(),
+      });
+    });
     this.syncHud();
     this.session?.refreshBoosters();
   }
@@ -425,7 +453,8 @@ export class App implements SessionHost {
     this.syncHud();
     const rest = describeReward(got, false);
     if (rest) ui.toast(`Daily gift: ${rest}`);
-    if (got.coins) await ui.coinsFly(this.center(), got.coins);
+    // the coins fly while the home screen is already live again
+    if (got.coins) void ui.coinsFly(this.center(), got.coins);
   }
 
   private async settings(): Promise<void> {
@@ -433,10 +462,12 @@ export class App implements SessionHost {
     await this.ask('settings', () => this.ui.pause('home', this.meta.settings, p => this.settingsChanged(p), this.pauseOptions()));
   }
 
-  /** Settings extras: "Privacy choices" where the ad consent rules require it. */
-  pauseOptions(): { privacy?: () => void } {
-    if (!this.ads.privacyOptionsRequired) return {};
-    return { privacy: () => void this.ads.showPrivacyOptions().catch(e => console.warn('app: privacy options failed', e)) };
+  /** Settings links: the privacy policy, and "Privacy choices" where the ad consent rules require them. */
+  pauseOptions(): PauseOptions {
+    const o: PauseOptions = {}, url = this.deps.privacyPolicyUrl;
+    if (url) o.policy = () => this.platform.openUrl(url);
+    if (this.ads.privacyOptionsRequired) o.privacy = () => void this.ads.showPrivacyOptions().catch(e => console.warn('app: privacy options failed', e));
+    return o;
   }
 
   settingsChanged(p: Partial<Settings>): void {
@@ -470,19 +501,28 @@ export class App implements SessionHost {
   private async productList(): Promise<Product[]> {
     if (this.products.length) return this.products;
     await Promise.race([this.storeReady, this.wait(STORE_WAIT_SEC)]);
-    try { this.products = await this.purchases.products(); } catch (e) { console.warn('app: no products', e); }
-    return this.products;
+    let list: Product[] = [];
+    try { list = await this.purchases.products(); } catch (e) { console.warn('app: no products', e); }
+    // keep the list only once the store priced everything; otherwise ask again on the next visit
+    if (list.length && list.every(p => p.price)) this.products = list;
+    return list;
   }
 
   /** Buy a product and hand over what it contains. True when it was bought. */
   async buy(id: ProductId): Promise<boolean> {
     const { meta, ui } = this;
+    if (this.rewards()[id].removeAds && !this.rewards()[id].coins && meta.removeAds) { ui.toast('You already have no ads'); return false; }
     let r: 'purchased' | 'cancelled' | 'failed';
     try { r = await this.purchases.buy(id); } catch { r = 'failed'; }
     this.analytics.event('purchase', { id, result: r });
-    if (r === 'failed') ui.toast(purchaseFailText(this.purchases.lastFailure));
+    if (r === 'failed') {
+      const f = this.purchases.lastFailure;
+      // the store may still finish it (Ask to Buy, slow payments, a lost connection after paying): deliver it then
+      if (f === 'pending' || f === 'store') meta.notePendingPurchase(id, this.now());
+      ui.toast(purchaseFailText(f));
+    }
     if (r !== 'purchased') return false;
-    const got = meta.applyPurchase(id);
+    const got = meta.applyPurchase(id, this.purchases.lastTransaction);
     this.audio.haptic('success');
     this.session?.refreshBoosters();
     this.syncHud();
@@ -491,16 +531,30 @@ export class App implements SessionHost {
     return true;
   }
 
-  private async restore(): Promise<void> {
+  private async restore(): Promise<ProductId[]> {
     let ids: ProductId[];
-    try { ids = await this.purchases.restore(); } catch { this.ui.toast('Could not reach the store. Try again later.'); return; }
+    try { ids = await this.purchases.restore(); } catch { this.ui.toast('Could not reach the store. Try again later.'); return []; }
     for (const id of ids) this.meta.restorePurchase(id);
     this.ui.toast(ids.length ? 'Purchases restored' : 'Nothing to restore');
+    return ids;
+  }
+
+  /** Purchases the store finished later: deliver the ones we were waiting for. */
+  private settlePurchases(list: StoreTransaction[]): void {
+    if (!this.m) return;
+    const got = this.meta.settlePurchases(list, this.now());
+    if (!got.length) return;
+    this.syncHud();
+    this.session?.refreshBoosters();
+    for (const g of got) {
+      this.analytics.event('purchase_late', { id: g.id });
+      this.ui.toast(`Your purchase arrived! ${describeReward(g.reward)}`);
+    }
   }
 
   async offer(kind: 'starter' | 'removeAds'): Promise<void> {
     const id: ProductId = kind === 'starter' ? 'starter_bundle' : 'remove_ads';
-    if (this.meta.owns(id)) return;
+    if (this.meta.owns(id) || (kind === 'removeAds' && this.meta.removeAds)) return;
     const product = (await this.productList()).find(p => p.id === id) ?? null;
     const c = await this.ask('offer', () => this.ui.offer({ kind, product, reward: this.rewards()[id] }));
     this.analytics.event('offer', { kind, choice: c });
@@ -518,9 +572,10 @@ export class App implements SessionHost {
   }
 
   async rewarded(p: RewardedPlacement): Promise<boolean> {
+    if (!this.ads.rewardedReady()) { this.ui.toast('No video available right now. Try again in a moment.'); return false; }
     const ok = await this.adBreak(() => this.ads.showRewarded(p), false);
     this.analytics.event('rewarded', { placement: p, earned: ok });
-    if (!ok) this.ui.toast('The video did not finish, so no reward this time');
+    if (!ok) this.ui.toast(p === 'dailyDouble' ? 'The video did not finish, so your gift was not doubled' : 'The video did not finish, so no reward this time');
     return ok;
   }
 
@@ -539,6 +594,8 @@ export class App implements SessionHost {
     this.audio.suspend(paused || this.adsOpen > 0);
     if (paused) { this.m?.save().catch(() => {}); return; }
     if (this.screen === 'play' && this.session?.running) void this.session.pause();
+    // back on home, maybe on a new day: redraw it (daily gift dot, lives)
+    else if (this.screen === 'home' && !this.modals.length && !this.homeBusy) this.enqueue({ kind: 'refresh' });
   }
 
   /** Android back: close the top modal, pause during play; on home it is not ours (the platform leaves the app). */
@@ -639,7 +696,7 @@ export function purchaseFailText(f: PurchaseFailure | null): string {
     case 'pending': return 'Your purchase is waiting for approval. It arrives as soon as it goes through.';
     case 'notConfigured': case 'unavailable': return "The store isn't available right now. Please try again later.";
     case 'busy': return 'Still finishing your last purchase. One moment!';
-    default: return 'The purchase did not go through. You were not charged.';
+    default: return 'The purchase did not go through. If the store charged you, it will arrive on its own.';
   }
 }
 

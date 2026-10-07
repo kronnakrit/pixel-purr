@@ -5,7 +5,7 @@ import {
   BOOSTER_KEYS, type AdsApi, type AnalyticsApi, type AudioApi, type BoosterButtonState, type BoosterKey, type BoosterPrice,
   type ContentApi, type EconomyConfig, type FailInfo, type GameSceneApi, type HomeChoice, type HomeState, type HudApi, type IntroKey,
   type LevelMeta, type LivesInfo, type MetaApi, type OfferInfo, type PlatformApi, type Point, type Product, type ProductContents,
-  type ProductId, type PurchaseFailure, type PurchasesApi, type RemoteConfigApi, type Reward, type RewardedPlacement, type ScreenInsets, type Settings,
+  type PauseOptions, type ProductId, type PurchaseFailure, type PurchasesApi, type ShopActions, type StoreTransaction, type RemoteConfigApi, type Reward, type RewardedPlacement, type ScreenInsets, type Settings,
   type Sfx, type ShopState, type TapTarget, type WinInfo,
 } from '../../src/app/contracts';
 import { App, type AppDeps } from '../../src/app/controller';
@@ -131,6 +131,20 @@ export class FakeMeta implements MetaApi {
     if (this.livesLeft > 0) this.livesLeft--;
   }
   refillLives() { this.livesLeft = 5; this.note('refillLives'); }
+  attempt: number | null = null;
+  pending: { id: ProductId; at: number }[] = [];
+  delivered = new Set<string>();
+  beginAttempt(n: number) { this.attempt = n; this.note(`beginAttempt:${n}`); }
+  endAttempt() { if (this.attempt !== null) this.note('endAttempt'); this.attempt = null; }
+  notePendingPurchase(id: ProductId, now: number) { this.pending.push({ id, at: now }); this.note(`notePendingPurchase:${id}`); }
+  settlePurchases(list: readonly StoreTransaction[], _now: number) {
+    const out: { id: ProductId; reward: Reward }[] = [];
+    for (const w of [...this.pending]) {
+      const t = list.find(x => x.id === w.id && !this.delivered.has(x.txn));
+      if (t) out.push({ id: w.id, reward: this.applyPurchase(w.id, t.txn) });
+    }
+    return out;
+  }
   addLives(n: number, now: number) {
     this.note(`addLives:${n}`);
     if (this.unlimitedUntil !== null && this.unlimitedUntil > now) return;
@@ -174,7 +188,9 @@ export class FakeMeta implements MetaApi {
     this.note(`grant:${reason}`);
   }
   owns(id: ProductId) { return this.owned.has(id); }
-  applyPurchase(id: ProductId): Reward {
+  applyPurchase(id: ProductId, txn?: string | null): Reward {
+    if (txn) { if (this.delivered.has(txn)) return {}; this.delivered.add(txn); }
+    this.pending = this.pending.filter(x => x.id !== id);
     const p = TEST_PRODUCTS[id];
     if (p.oneTime) this.owned.add(id);
     this.grant(p.reward, `purchase:${id}`);
@@ -242,12 +258,21 @@ export class FakePurchases implements PurchasesApi {
   result: 'purchased' | 'cancelled' | 'failed' = 'purchased';
   restored: ProductId[] = [];
   lastFailure: PurchaseFailure | null = null;
+  lastTransaction: string | null = null;
+  txnCbs: ((l: StoreTransaction[]) => void)[] = [];
+  /** Throw from restore() (store unreachable). */
+  restoreFails = false;
+  onTransactions(cb: (l: StoreTransaction[]) => void) { this.txnCbs.push(cb); }
+  report(l: StoreTransaction[]) { this.txnCbs.forEach(f => f(l)); }
   list: Product[] = (Object.keys(TEST_PRODUCTS) as ProductId[]).map(id => ({ id, title: id, description: id, price: '$0.99' }));
   constructor(private readonly log: Log) {}
   init() { this.log.push('purchases.init'); return Promise.resolve(); }
   products() { return Promise.resolve(this.list); }
   buy(id: ProductId) { this.log.push(`purchases.buy:${id}`); return Promise.resolve(this.result); }
-  restore() { this.log.push('purchases.restore'); return Promise.resolve(this.restored); }
+  restore() {
+    this.log.push('purchases.restore');
+    return this.restoreFails ? Promise.reject(new Error('offline')) : Promise.resolve(this.restored);
+  }
 }
 
 export class FakeRemoteConfig implements RemoteConfigApi {
@@ -276,6 +301,8 @@ export class FakePlatform implements PlatformApi {
   onBack(cb: () => boolean) { this.backCbs.push(cb); }
   setPaused(p: boolean) { this.pauseCbs.forEach(f => f(p)); }
   back(): boolean { return this.backCbs.some(f => f()); }
+  opened: string[] = [];
+  openUrl(url: string) { this.opened.push(url); }
 }
 
 // ---------------------------------------------------------------- audio
@@ -380,7 +407,6 @@ const ON_BACK: Partial<Record<Modal, unknown>> = {
   intro: undefined, boosterUnlock: undefined, win: 'continue', fail: 'giveup', pause: 'resume', shop: undefined, stickerBook: undefined,
   dailyGift: 'claim', outOfLives: 'close', offer: 'close', buyBooster: 'close',
 };
-type ShopActions = { buy(id: ProductId): Promise<boolean>; video(): Promise<boolean>; restore(): Promise<void> };
 
 /** UI whose cards stay open until the test answers them, unless an auto-answer is set for that card. */
 export class FakeUi implements AppUi {
@@ -400,7 +426,7 @@ export class FakeUi implements AppUi {
   shopActions: ShopActions | null = null;
   sfxCb: ((s: Sfx) => void) | null = null;
   covered = false;
-  pauseOpts: { privacy?: () => void } | undefined = undefined;
+  pauseOpts: PauseOptions | undefined = undefined;
   constructor(private readonly log: Log) {}
 
   private ask<T>(m: Modal, a: unknown[]): Promise<T> {
@@ -427,7 +453,7 @@ export class FakeUi implements AppUi {
   boosterUnlock(k: BoosterKey, free: number) { return this.ask<void>('boosterUnlock', [k, free]); }
   win(w: WinInfo) { return this.ask<'continue' | 'double'>('win', [w]); }
   fail(f: FailInfo) { return this.ask<'coins' | 'video' | 'giveup'>('fail', [f]); }
-  pause(mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void, opts?: { privacy?: () => void }) {
+  pause(mode: 'play' | 'home', s: Settings, onChange: (p: Partial<Settings>) => void, opts?: PauseOptions) {
     this.settingsCb = onChange;
     this.pauseOpts = opts;
     return this.ask<'resume' | 'restart' | 'home'>('pause', [mode, s]);

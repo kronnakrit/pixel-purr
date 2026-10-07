@@ -95,7 +95,8 @@ const homeState = (): HomeState => ({
 const shopActions = {
   buy: (id: ProductId) => new Promise<boolean>(r => setTimeout(() => { ui.toast(`bought ${id}`); r(true); }, 1200)),
   video: () => new Promise<boolean>(r => setTimeout(() => r(true), 800)),
-  restore: () => new Promise<void>(r => setTimeout(r, 800)),
+  restore: () => new Promise<ProductId[]>(r => setTimeout(() => r(['remove_ads']), 800)),
+  videoReady: () => flag('video'),
 };
 
 const SCREENS: Record<string, () => void> = {
@@ -123,7 +124,7 @@ const SCREENS: Record<string, () => void> = {
     if (mode === 'home') void ui.home(homeState()); else play(18);
     again(() => ui.pause(mode, settings, p => { Object.assign(settings, p); ui.toast(JSON.stringify(p)); }));
   },
-  shop: () => { ui.hud.setCoins(1240); again(() => ui.shop({ coins: 1240, products: PRODUCTS, owned: qs.get('owned') === '1' ? ['cosy_bundle'] : [], videoReady: flag('video'), rewards: REWARDS }, shopActions)); },
+  shop: () => { ui.hud.setCoins(1240); again(() => ui.shop({ coins: 1240, products: PRODUCTS, owned: qs.get('owned') === '1' ? ['cosy_bundle'] : [], removeAds: qs.get('owned') === '1', videoReady: flag('video'), videoCoins: 100, rewards: REWARDS }, shopActions)); },
   stickers: () => {
     const items = qs.get('empty') === '1' ? [] : Array.from({ length: Number(qs.get('count') ?? 14) }, (_, i) => ({ n: i + 1, name: PICTURES[i % PICTURES.length]!.name, picture: pic(i + 1) }));
     again(() => ui.stickerBook(items));

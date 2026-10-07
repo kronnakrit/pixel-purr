@@ -100,7 +100,7 @@ function render() {
   $('#adsNote').textContent = `${ads.count} interstitials · ${may ? 'may show now' : 'not now'}`;
   $('#shop').replaceChildren(
     ...PRODUCT_IDS.map(id => button(id.replace('coins_', '').replace('_', ' '), meta.owns(id) ? 'off' : '', () => {
-      say(`${id}: ${rewardText(meta.applyPurchase(id, now()))}`);
+      say(`${id}: ${rewardText(meta.applyPurchase(id, null, now()))}`);
     })),
     button('Show interstitial', 'blue', () => {
       if (!meta.mayShowInterstitial({ level: meta.level, afterLoss: false, now: now() })) { say('policy says no'); return; }

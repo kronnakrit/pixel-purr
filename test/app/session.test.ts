@@ -259,11 +259,12 @@ describe('winning', () => {
     await h.until(() => h.ui.count('home') === 2);
     h.order(
       'scene.celebrate', 'meta.completeLevel:10', 'ui.win', 'ads.showRewarded:doubleCoins', 'meta.addCoins:40:win:double', 'ui.coinsFly',
-      'meta.takeStarterOfferMoment:true', 'ui.offer', 'meta.mayShowInterstitial:10:false:true', 'ads.showInterstitial:true',
-      'meta.recordInterstitial', 'meta.takeRemoveAdsOfferMoment:true', 'ui.offer', 'scene.clear', 'ui.home',
+      'meta.takeStarterOfferMoment:true', 'ui.offer', 'scene.clear', 'ui.home',
     );
+    // the player just watched a video: no interstitial straight after it
+    expect(h.log.some(e => e.startsWith('ads.showInterstitial'))).toBe(false);
     expect(h.ui.last<{ from: unknown; amount: number }>('coinsFly')).toEqual({ from: { x: 195, y: 300 }, amount: 80 });
-    expect(h.ui.calls.filter(c => c.m === 'offer').map(c => (c.a[0] as OfferInfo).kind)).toEqual(['starter', 'removeAds']);
+    expect(h.ui.calls.filter(c => c.m === 'offer').map(c => (c.a[0] as OfferInfo).kind)).toEqual(['starter']);
     const starter = h.ui.calls.find(c => c.m === 'offer')!.a[0] as OfferInfo;
     expect(starter.product?.id).toBe('starter_bundle');
     expect(starter.reward.coins).toBe(2500);
@@ -271,6 +272,20 @@ describe('winning', () => {
     expect(h.meta.level).toBe(11);
     expect(h.meta.livesLeft).toBe(5);
     expect(h.audio.suspended).toBe(false);
+  });
+
+  it('without the double video, the interstitial policy runs and the Remove Ads offer follows the 3rd ad', async () => {
+    const h = new Harness();
+    h.meta.level = 10;
+    h.meta.interstitials = 2;
+    h.meta.starterOffered = true;
+    h.content.custom.set(10, () => quickWin(10));
+    await h.start();
+    await h.playFromHome();
+    h.scene.tap({ kind: 'queue', q: 0 });
+    await h.until(() => h.ui.count('home') === 2);
+    h.order('ui.win', 'ui.coinsFly', 'meta.mayShowInterstitial:10:false:true', 'ads.showInterstitial:true',
+      'meta.recordInterstitial', 'meta.takeRemoveAdsOfferMoment:true', 'ui.offer', 'scene.clear', 'ui.home');
   });
 
   it('buying from the starter offer applies the bundle', async () => {

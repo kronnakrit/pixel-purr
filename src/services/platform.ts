@@ -119,5 +119,10 @@ export function createPlatform(o: {
       return () => { const i = backCbs.lastIndexOf(cb); if (i >= 0) backCbs.splice(i, 1); };
     },
     back: runBack,
+    openUrl(url) {
+      // On a phone, Capacitor opens any page outside the app in the system browser and keeps the game where it was.
+      if (o.native) window.location.href = url;
+      else window.open(url, '_blank', 'noopener');
+    },
   };
 }
