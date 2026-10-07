@@ -120,6 +120,15 @@ describe('tray and queues', () => {
     expect(T.catW).toBeLessThan(T.cs);
   });
 
+  it.each(SIZES)('keeps the overflow cat on a %ix%i screen and off the last cat', (W, H) => {
+    for (const n of [5, 6]) {
+      const T = trayLayout(computeLayout(W, H, HUD), n);
+      expect(T.over.x + T.catW * 0.72).toBeLessThanOrEqual(W + 1e-9); // tail included
+      expect(Math.hypot(T.over.x - T.xs[n - 1]!, T.over.y - T.catY)).toBeGreaterThan(0.85 * T.catW);
+      expect(T.xs[n]).toBe(T.over.x);
+    }
+  });
+
   it('centres the queue columns', () => {
     for (const nq of [2, 3, 4]) {
       const xs = queueXs(L, nq);

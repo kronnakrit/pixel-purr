@@ -170,4 +170,47 @@ describe('boosters', () => {
     expect(h.game.trayCap).toBe(6);
     expect(h.ui.hud.button('slot').enabled).toBe(false);
   });
+
+  it('a double tap on Yarn Shuffle uses one; a later tap uses another', async () => {
+    const h = new Harness();
+    h.meta.level = 6;
+    h.content.custom.set(6, () => make(RING, [[[CHERRY, 1]], [[SODA, 4], [SODA, 4]]], 5, 6));
+    await h.start();
+    await h.playFromHome();
+    const before = h.meta.boosterCount('shuffle');
+    h.ui.hud.boosterCb('shuffle');
+    h.ui.hud.boosterCb('shuffle');
+    await h.run(200);
+    expect(h.meta.boosterCount('shuffle')).toBe(before - 1);
+    await h.run(800);
+    h.ui.hud.boosterCb('shuffle');
+    await h.run(100);
+    expect(h.meta.boosterCount('shuffle')).toBe(before - 2);
+  });
+});
+
+describe('ads and the app lifecycle', () => {
+  it('coming back from our own video does not pause the game; coming back from elsewhere does', async () => {
+    const h = new Harness();
+    h.content.custom.set(1, () => make(RING, [[[CHERRY, 1]], [[SODA, 8]]], 0, 1));
+    h.meta.seen.add('basics');
+    await h.start();
+    await h.playFromHome();
+    await h.launch(0);
+    await h.until(() => h.ui.isOpen('fail'));
+    h.ads.hold = true;
+    h.ui.answer('fail', 'video');
+    await h.until(() => h.ads.shown.length === 1);
+    h.platform.setPaused(true); // Android pauses the app while the ad's own screen is up
+    h.ads.release();
+    await h.run(50);
+    h.platform.setPaused(false);
+    await h.run(300);
+    expect(h.running).toBe(true);
+    expect(h.ui.count('pause')).toBe(0);
+    await h.run(2000);
+    h.platform.setPaused(true);
+    h.platform.setPaused(false);
+    await h.until(() => h.ui.isOpen('pause'));
+  });
 });

@@ -84,7 +84,7 @@ let fontsOk = false;
 function drawNumber(cv: HTMLCanvasElement, label: string): void {
   const ctx = cv.getContext('2d')!, mystery = label === '?';
   ctx.clearRect(0, 0, cv.width, cv.height);
-  const size = mystery ? 108 : label.length > 2 ? 76 : 98;
+  const size = mystery ? 112 : label.length > 2 ? 88 : 112;
   ctx.font = `${size}px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round'; ctx.lineWidth = size * 0.24; ctx.strokeStyle = INK;
   const y = cv.height / 2 + size * 0.06;

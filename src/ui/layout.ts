@@ -5,13 +5,15 @@ export interface MapLayout { pts: Point[]; height: number; amp: number }
 
 /**
  * Winding level path. levels[0] sits at the bottom, the last one at the top. Each node's x sways on a sine of its
- * level number, so a level keeps its place on the path as the player advances.
+ * level number, so a level keeps its place on the path as the player advances. On narrow phones the path moves right
+ * so no node passes under the Daily gift button (`left` is the smallest node centre x that clears it).
  */
-export function mapLayout(levels: readonly number[], width: number, o: { spacing?: number; pad?: number } = {}): MapLayout {
-  const spacing = o.spacing ?? 92, pad = o.pad ?? 72;
+export function mapLayout(levels: readonly number[], width: number, o: { spacing?: number; pad?: number; left?: number } = {}): MapLayout {
+  const spacing = o.spacing ?? 92, pad = o.pad ?? 72, left = o.left ?? 108;
   const amp = Math.max(0, Math.min(96, width / 2 - 76));
+  const shift = Math.max(0, Math.min(left - (width / 2 - amp), width / 2 - amp - 46));
   const height = pad * 2 + Math.max(0, levels.length - 1) * spacing;
-  const pts = levels.map((n, i) => ({ x: Math.round(width / 2 + Math.sin(n * 1.1) * amp), y: height - pad - i * spacing }));
+  const pts = levels.map((n, i) => ({ x: Math.round(width / 2 + shift + Math.sin(n * 1.1) * amp), y: height - pad - i * spacing }));
   return { pts, height, amp };
 }
 

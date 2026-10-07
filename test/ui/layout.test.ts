@@ -15,6 +15,8 @@ describe('mapLayout', () => {
       const { pts, amp } = mapLayout(levels, W);
       expect(amp).toBeLessThanOrEqual(96);
       for (const p of pts) { expect(p.x).toBeGreaterThanOrEqual(46); expect(p.x).toBeLessThanOrEqual(W - 46); }
+      // nodes (60 px) stay clear of the Daily gift button (left 14, 58 wide) from 360 px up
+      if (W >= 360) for (const n of Array.from({ length: 40 }, (_, i) => i + 1)) expect(mapLayout([n], W).pts[0]!.x - 30).toBeGreaterThan(72);
       const xs = pts.map(p => p.x);
       expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(amp); // it really winds
     }

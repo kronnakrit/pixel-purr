@@ -23,6 +23,8 @@ export const SHOP_VIDEO_COINS = 100;
 /** Longest wait for store set-up before showing the shop anyway. */
 const STORE_WAIT_SEC = 3;
 const FONT_WAIT_MS = 3000;
+/** A resume this soon after one of our full-screen ads closed comes from the ad, not from the player leaving. */
+const AD_RESUME_GRACE_MS = 1500;
 
 export type MetaLoader = (economy: Record<string, unknown> | undefined) => Promise<MetaApi>;
 
@@ -95,6 +97,8 @@ export class App implements SessionHost {
   private frameWaiters: (() => void)[] = [];
   private bg = false;
   private adsOpen = 0;
+  /** When the last full-screen ad closed (see background()). */
+  private adEndedAt = -Infinity;
   private clearFrames = 0;
   private frameFailed = false;
   private nextLivesTick = 0;
@@ -567,6 +571,7 @@ export class App implements SessionHost {
     this.audio.suspend(true);
     try { return await show(); } catch (e) { console.warn('app: ad failed', e); return fallback; } finally {
       this.adsOpen--;
+      this.adEndedAt = this.now();
       this.audio.suspend(this.bg || this.adsOpen > 0);
     }
   }
@@ -593,7 +598,9 @@ export class App implements SessionHost {
     this.lastT = null;
     this.audio.suspend(paused || this.adsOpen > 0);
     if (paused) { this.m?.save().catch(() => {}); return; }
-    if (this.screen === 'play' && this.session?.running) void this.session.pause();
+    // On Android our own full-screen ads pause and resume the app; coming back from one is not leaving the game.
+    const fromAd = this.adsOpen > 0 || this.now() - this.adEndedAt < AD_RESUME_GRACE_MS;
+    if (this.screen === 'play' && this.session?.running) { if (!fromAd) void this.session.pause(); }
     // back on home, maybe on a new day: redraw it (daily gift dot, lives)
     else if (this.screen === 'home' && !this.modals.length && !this.homeBusy) this.enqueue({ kind: 'refresh' });
   }

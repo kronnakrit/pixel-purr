@@ -237,7 +237,7 @@ describe('losing', () => {
 });
 
 describe('winning', () => {
-  it('celebrates, records the win, shows the card, doubles with a video, flies the coins, then offers and the ad policy', async () => {
+  it('records the win, celebrates, shows the card, doubles with a video, flies the coins, then offers and the ad policy', async () => {
     const h = new Harness();
     h.meta.level = 10;
     h.meta.interstitials = 2;
@@ -246,10 +246,14 @@ describe('winning', () => {
     await h.playFromHome();
     h.scene.holdCelebrate = true;
     h.ui.auto.win = undefined;
+    const saves = h.meta.saves;
     h.scene.tap({ kind: 'queue', q: 0 });
     await h.until(() => h.log.includes('scene.celebrate'));
     await h.run(500);
-    expect(h.log.some(e => e.startsWith('meta.completeLevel'))).toBe(false); // waits for the celebration
+    // the win is saved before the dance, so closing the app during it keeps the level
+    expect(h.log).toContain('meta.completeLevel:10');
+    expect(h.meta.saves).toBeGreaterThan(saves);
+    expect(h.ui.isOpen('win')).toBe(false); // the card waits for the celebration
     h.scene.releaseCelebrate();
     await h.until(() => h.ui.isOpen('win'));
     const w = h.ui.last<WinInfo>('win');
@@ -258,7 +262,7 @@ describe('winning', () => {
     h.ui.answer('win', 'double');
     await h.until(() => h.ui.count('home') === 2);
     h.order(
-      'scene.celebrate', 'meta.completeLevel:10', 'ui.win', 'ads.showRewarded:doubleCoins', 'meta.addCoins:40:win:double', 'ui.coinsFly',
+      'meta.completeLevel:10', 'scene.celebrate', 'ui.win', 'ads.showRewarded:doubleCoins', 'meta.addCoins:40:win:double', 'ui.coinsFly',
       'meta.takeStarterOfferMoment:true', 'ui.offer', 'scene.clear', 'ui.home',
     );
     // the player just watched a video: no interstitial straight after it

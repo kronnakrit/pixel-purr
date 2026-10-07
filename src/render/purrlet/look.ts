@@ -263,7 +263,7 @@ export function faceGeometry(f: Face): THREE.BufferGeometry {
 }
 
 /** Number decal rectangle on the pot front (2:1, like the number textures); big, so counts read at belt size. */
-const NUM = { x0: -0.25, x1: 0.25, y0: 0.075, y1: 0.325 };
+const NUM = { x0: -0.32, x1: 0.32, y0: 0.05, y1: 0.37 };
 let numberGeo: THREE.BufferGeometry | null = null;
 export const numberGeometry = () => (numberGeo ??= frontDecal(potDepth, NUM.x0, NUM.x1, NUM.y0, NUM.y1, 10, 2, 0.004));
 

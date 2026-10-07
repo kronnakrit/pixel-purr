@@ -300,7 +300,7 @@ export class GameScene implements GameSceneApi {
     const finish = () => {
       if (done || gen !== this.gen || !this.byId.has(id)) return;
       done = true;
-      this.stars.burst(c.x, c.y - c.w * CAT_H * 0.55, c.w, GOLD, this.paints[c.view.color] ?? WHITE);
+      this.stars.burst(c.x, c.y - c.w * CAT_H * 0.55, c.w, GOLD, this.paints[c.view.color] ?? WHITE, 9, this.reduced);
       this.dead.push(c);
     };
     void c.view.pop().then(finish);
@@ -364,7 +364,8 @@ export class GameScene implements GameSceneApi {
         break;
       case 'tray': {
         const T = this.tray.layout;
-        if (T) { c.tx = T.xs[Math.min(p.i, T.xs.length - 1)]!; c.ty = T.catY; c.tw = T.catW; }
+        const over = !!T && p.i >= T.xs.length - 1; // the one that did not fit perches past the end, worried
+        if (T) { c.tx = over ? T.over.x : T.xs[p.i]!; c.ty = over ? T.over.y : T.catY; c.tw = T.catW; }
         c.tdim = 0;
         break;
       }
@@ -546,7 +547,9 @@ export class GameScene implements GameSceneApi {
     const L = this.L, g = this.game, s = L.col.w / 390, n = this.reduced ? 50 : 120;
     const cols = [GOLD, PINK, WHITE, ...(g ? g.level.colors.map(c => this.paints[c]!) : [])];
     for (let i = 0; i < n; i++) {
-      this.confetti.drop(L.col.x + Math.random() * L.col.w, L.block.y - 10 - Math.random() * 60 * s, (7 + Math.random() * 6) * s,
+      // Reduce Motion: still sprinkles that pop up over the board and fade, instead of falling confetti
+      const y = this.reduced ? L.block.y + Math.random() * L.block.h : L.block.y - 10 - Math.random() * 60 * s;
+      this.confetti.drop(L.col.x + Math.random() * L.col.w, y, (7 + Math.random() * 6) * s,
         (150 + Math.random() * 110) * s, cols[i % cols.length]!, Math.random() * 1.3, !this.reduced);
     }
   }

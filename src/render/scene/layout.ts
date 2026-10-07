@@ -174,17 +174,23 @@ export function riderArc(arcs: Float64Array, s: number, frac: number, cell: numb
 
 // ---------------------------------------------------------------- tray and queues
 
-export interface TrayLayout { panel: Rect; cs: number; xs: number[]; cy: number; catW: number; catY: number }
+export interface TrayLayout {
+  panel: Rect; cs: number; xs: number[]; cy: number; catW: number; catY: number;
+  /** Where the overflow cat (index n, when lost) perches: past the tray's right end, lifted, kept on screen. */
+  over: Pt;
+}
 
 /** n cushions (5, or more after Extra Cushion) centred in the tray row. Index n (the overflow when lost) sits past the end. */
 export function trayLayout(L: Layout, n: number): TrayLayout {
   const cw = L.col.w, gap = 0.018 * cw, pad = 0.022 * cw;
   const cs = Math.min(0.152 * cw, (0.94 * cw - 2 * pad - (n - 1) * gap) / n);
   const pw = n * cs + (n - 1) * gap + 2 * pad, ph = cs + 2 * pad;
-  const cx = L.col.x + cw / 2, cy = L.tray.y + L.tray.h / 2;
+  const cx = L.col.x + cw / 2, cy = L.tray.y + L.tray.h / 2, catW = cs * 0.86, catY = cy + cs * 0.4;
   const panel: Rect = { x: cx - pw / 2, y: cy - ph / 2, w: pw, h: ph };
-  const xs = Array.from({ length: n + 1 }, (_, i) => Math.min(L.W - cs / 2, panel.x + pad + cs / 2 + i * (cs + gap)));
-  return { panel, cs, xs, cy, catW: cs * 0.86, catY: cy + cs * 0.4 };
+  const xs = Array.from({ length: n }, (_, i) => panel.x + pad + cs / 2 + i * (cs + gap));
+  const over = { x: Math.min(L.W - catW * 0.72, panel.x + pw + catW * 0.3), y: catY - cs * 0.62 };
+  xs.push(over.x);
+  return { panel, cs, xs, cy, catW, catY, over };
 }
 
 /** Centre x of each queue column. */

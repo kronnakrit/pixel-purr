@@ -11,8 +11,8 @@ const m4 = new Matrix4(), pos = new Vector3(), scl = new Vector3(), q = new Quat
 const Z = new Vector3(0, 0, 1);
 
 /** Fields per particle: x, y, depth, vx, vy, age, life, size, rot, vr, a, b, c, d (kind-specific). */
-const NF = 14;
-const X = 0, Y = 1, D = 2, VX = 3, VY = 4, AGE = 5, LIFE = 6, SIZE = 7, ROT = 8, VR = 9, A = 10, B = 11, C = 12, DD = 13;
+const NF = 15;
+const X = 0, Y = 1, D = 2, VX = 3, VY = 4, AGE = 5, LIFE = 6, SIZE = 7, ROT = 8, VR = 9, A = 10, B = 11, C = 12, DD = 13, SW = 14;
 
 abstract class Pool {
   readonly mesh: InstancedMesh;
@@ -113,14 +113,16 @@ export class Stars extends Pool {
     super(new ShapeGeometry(starShape()), new MeshBasicMaterial({ fog: false, side: DoubleSide }), cap);
   }
 
-  /** Burst around (x, y) sized for a cat w px wide: stars travel about 0.8 w. */
-  burst(x: number, y: number, w: number, color: Color, accent: Color, count = 9): void {
+  /** Burst around (x, y) sized for a cat w px wide: stars travel about 0.8 w. Still (Reduce Motion): one star grows
+   *  and fades where the cat was. */
+  burst(x: number, y: number, w: number, color: Color, accent: Color, count = 9, still = false): void {
+    if (still) count = 1;
     for (let k = 0; k < count; k++) {
-      const a = (k / count) * Math.PI * 2 + Math.random() * 0.4, sp = w * (3.4 + Math.random() * 1.6);
+      const a = (k / count) * Math.PI * 2 + Math.random() * 0.4, sp = still ? 0 : w * (3.4 + Math.random() * 1.6);
       const i = this.add(k % 3 === 2 ? accent : color), o = i * NF, f = this.f;
       f[o + X] = x; f[o + Y] = y; f[o + VX] = Math.cos(a) * sp; f[o + VY] = Math.sin(a) * sp;
-      f[o + LIFE] = 0.55 + Math.random() * 0.2; f[o + SIZE] = w * (0.24 + Math.random() * 0.1);
-      f[o + VR] = (Math.random() - 0.5) * 10; f[o + D] = -6;
+      f[o + LIFE] = 0.55 + Math.random() * 0.2; f[o + SIZE] = w * (still ? 0.5 : 0.24 + Math.random() * 0.1);
+      f[o + VR] = still ? 0 : (Math.random() - 0.5) * 10; f[o + D] = -6;
     }
   }
 
@@ -140,12 +142,13 @@ export class Confetti extends Pool {
     super(new PlaneGeometry(1, 0.55), new MeshBasicMaterial({ fog: false, side: DoubleSide }), cap);
   }
 
-  /** Drop one piece from (x, y), starting after `delay` seconds. */
-  drop(x: number, y: number, size: number, fall: number, color: Color, delay: number, spin: boolean): void {
+  /** Drop one piece from (x, y), starting after `delay` seconds. Without `moving` (Reduce Motion) it stays where it
+   *  appears: no fall, drift, sway or spin. */
+  drop(x: number, y: number, size: number, fall: number, color: Color, delay: number, moving: boolean): void {
     const i = this.add(color), o = i * NF, f = this.f;
-    f[o + X] = x; f[o + Y] = y; f[o + VY] = fall; f[o + VX] = (Math.random() - 0.5) * 50;
-    f[o + AGE] = -delay; f[o + LIFE] = 3.2; f[o + SIZE] = size; f[o + D] = -8;
-    f[o + VR] = spin ? 4 + Math.random() * 6 : 0; f[o + ROT] = Math.random() * 6;
+    f[o + X] = x; f[o + Y] = y; f[o + VY] = moving ? fall : 0; f[o + VX] = moving ? (Math.random() - 0.5) * 50 : 0;
+    f[o + AGE] = -delay; f[o + LIFE] = 3.2; f[o + SIZE] = size; f[o + D] = -8; f[o + SW] = moving ? 40 : 0;
+    f[o + VR] = moving ? 4 + Math.random() * 6 : 0; f[o + ROT] = Math.random() * 6;
     const ax = Math.random() - 0.5, ay = Math.random() - 0.5, az = Math.random() * 0.6 + 0.2, l = Math.hypot(ax, ay, az);
     f[o + A] = ax / l; f[o + B] = ay / l; f[o + C] = az / l; f[o + DD] = Math.random() * 6;
   }
@@ -154,7 +157,7 @@ export class Confetti extends Pool {
     const f = this.f;
     if (f[o + AGE]! < 0) return 0;
     f[o + Y]! += f[o + VY]! * dt;
-    f[o + X]! += (f[o + VX]! + Math.sin(f[o + AGE]! * 3 + f[o + DD]!) * 40) * dt;
+    f[o + X]! += (f[o + VX]! + Math.sin(f[o + AGE]! * 3 + f[o + DD]!) * f[o + SW]!) * dt;
     f[o + ROT]! += f[o + VR]! * dt;
     q.copy(camQ).multiply(qs.setFromAxisAngle(axis.set(f[o + A]!, f[o + B]!, f[o + C]!), f[o + ROT]!));
     return f[o + SIZE]! * (u > 0.85 ? (1 - u) / 0.15 : 1);

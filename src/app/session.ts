@@ -13,6 +13,8 @@ export type SessionEnd = 'won' | 'giveup' | 'restart' | 'home' | 'abort';
 export const LOSE_PAUSE = 0.9;
 /** Autoplay waits this long after the belt empties before the next tap, so each move reads clearly. */
 export const AUTO_GAP = 0.3;
+/** A second tap on the same booster within this many ms is ignored, so a double tap uses one. */
+export const BOOSTER_COOLDOWN_MS = 600;
 
 export interface SessionOptions {
   /** Attempt number (0 = first), salts the Yarn Shuffle seed. */
@@ -33,6 +35,8 @@ export class Session {
   private phase: 'ready' | 'live' | 'ended' = 'ready';
   /** Open modals and running flows; the clock stops while any is held. */
   private holds = 0;
+  /** When each booster was last used, so a double tap uses one. */
+  private readonly usedAt: Partial<Record<BoosterKey, number>> = {};
   private acc = 0;
   private flow: 'lost' | 'won' | null = null;
   private readonly rng: Rng;
@@ -107,6 +111,8 @@ export class Session {
     const { meta, ui, ads, audio } = this.host;
     if (!this.running || !meta.isBoosterUnlocked(k)) return;
     if (!this.canUse(k)) { audio.play('blocked'); return; }
+    const since = this.host.now() - (this.usedAt[k] ?? -Infinity);
+    if (since >= 0 && since < BOOSTER_COOLDOWN_MS) return;
     if (meta.boosterCount(k) > 0) { if (meta.useBooster(k)) this.applyBooster(k, 'stock'); return; }
     this.holds++;
     try {
@@ -132,6 +138,7 @@ export class Session {
 
   private applyBooster(k: BoosterKey, via: string): void {
     const g = this.game;
+    this.usedAt[k] = this.host.now();
     if (k === 'slot') this.cushioned = true;
     const ev = k === 'slot' ? g.addTraySlot() : k === 'shuffle' ? g.shuffleQueues(this.rng) : k === 'nap' ? g.napTray() : g.armXray();
     this.emit(ev);
@@ -194,8 +201,6 @@ export class Session {
     const s = this.game.status;
     if (s === 'playing' || this.flow || this.phase !== 'live') return;
     this.notify(s);
-    // the picture is done: closing the app during the celebration must not cost a life
-    if (s === 'won') this.host.meta.endAttempt();
     if (s === 'won') void this.won();
     else void this.lost();
   }
@@ -240,9 +245,12 @@ export class Session {
     this.holds++;
     this.tutorial?.stop();
     try {
-      await scene.celebrate();
+      // Keep the win before the dance: the app may be closed or evicted while it plays.
+      meta.endAttempt();
       const { coins, firstClear } = meta.completeLevel(n, this.info.spicy, h.now());
+      void meta.save();
       analytics.event('level_win', { level: n, continued: this.continued, firstClear });
+      await scene.celebrate();
       const choice = await h.ask('win', () => ui.win({ level: n, name: this.info.name, picture: content.levelPicture(n), coins, canDouble: ads.rewardedReady() }));
       let total = coins, watched = false;
       if (choice === 'double' && await h.rewarded('doubleCoins')) { meta.addCoins(coins, 'win:double'); total += coins; watched = true; }
