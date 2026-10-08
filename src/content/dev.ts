@@ -1,15 +1,16 @@
 // Dev contact sheet (dev/content.html): every level picture as candy cubes plus a 1:1 thumbnail, to check that
-// each one reads at its grid size. Query: from, to (level range, default 21-60), cell (px per pixel, default 6),
-// stats=1 (also builds each level and prints its queues; slow for endless levels), recipe=1 (draw 21-60 straight
-// from the recipes in pictures.ts instead of the level files, to iterate on a picture before regenerating).
+// each one reads at its grid size. Query: from, to (level range, default 21-100), cell (px per pixel, default 6),
+// stats=1 (also builds each level and prints its queues; slow for endless levels), recipe=1 (draw 21-100 straight
+// from the recipes in pictures*.ts instead of the level files, to iterate on a picture before regenerating).
 import '../fonts';
 import { PALETTE, colorsOf, countPixels, raster, type Picture } from '../engine';
 import { BOARD, drawPicture } from '../editor/draw';
 import { content } from './index';
-import { PICTURES_21_60 } from './pictures';
+import { FIRST_FILE_LEVEL, LAST_FILE_LEVEL } from './params';
+import { FILE_PICTURES } from './recipes';
 
 const q = new URLSearchParams(location.search);
-const from = Number(q.get('from') ?? 21), to = Number(q.get('to') ?? 60), cell = Number(q.get('cell') ?? 6);
+const from = Number(q.get('from') ?? 21), to = Number(q.get('to') ?? LAST_FILE_LEVEL), cell = Number(q.get('cell') ?? 6);
 const stats = q.get('stats') === '1', recipe = q.get('recipe') === '1';
 
 function drawCubes(cv: HTMLCanvasElement, pic: Picture, c: number): void {
@@ -31,7 +32,7 @@ function drawFlat(cv: HTMLCanvasElement, pic: Picture): void {
 
 const grid = document.getElementById('grid')!;
 for (let n = from; n <= to; n++) {
-  const def = recipe ? PICTURES_21_60[n - 21] : undefined;
+  const def = recipe ? FILE_PICTURES[n - FIRST_FILE_LEVEL] : undefined;
   const pic = def ? raster(def, def.size) : content.levelPicture(n);
   const meta = def ? { name: def.name, spicy: n % 5 === 0 } : content.levelMeta(n);
   const card = document.createElement('div'), big = document.createElement('canvas'), small = document.createElement('canvas');

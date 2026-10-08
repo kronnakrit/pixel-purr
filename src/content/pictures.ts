@@ -1,35 +1,9 @@
 // The 40 pictures for levels 21-60 (cosy treats, comforts and cute animals), in level order, as shape recipes
 // (see src/engine/picture.ts). Shapes and order are level data: after changing one, rerun `npx tsx tools/levels.ts`.
-import type { Layer, PictureDef, Shape, Shapes } from '../engine/picture';
+import type { Layer } from '../engine/picture';
+import { blush, dots, eyes, face, pair, sleepy, sparkle, stars, streak, zee, type ContentPicture } from './shapes';
 
-export interface ContentPicture extends PictureDef {
-  /** Grid size of its level (24-32): small, simple pictures early, full scenes late. */
-  size: number;
-  /** Fills the whole board (like Sakura Sky and Moon Night). */
-  bg?: true;
-}
-
-// Kawaii bits shared by many pictures. gap = half the distance between the two eyes / cheeks.
-const pair = (s: Shapes, cx: number, cy: number, gap: number, rx: number, ry: number): Shape =>
-  s.or(s.ell(cx - gap, cy, rx, ry), s.ell(cx + gap, cy, rx, ry));
-const eyes = (s: Shapes, cx: number, cy: number, gap: number, r = 0.032): Shape => pair(s, cx, cy, gap, r, r * 1.35);
-const blush = (s: Shapes, cx: number, cy: number, gap: number, r = 0.05): Shape => pair(s, cx, cy, gap, r, r * 0.6);
-const face = (s: Shapes, cx: number, cy: number, gap: number, r = 0.032): Layer[] => [
-  [eyes(s, cx, cy, gap, r), 'licorice'],
-  [blush(s, cx, cy + r * 2.4, gap + r * 1.9, r * 1.5), 'bubblegum'],
-];
-/** Closed sleepy eyes: two little arcs. */
-const sleepy = (s: Shapes, cx: number, cy: number, gap: number, r = 0.05): Shape => s.or(
-  s.and(s.circ(cx - gap, cy - r * 0.6, r), s.not(s.circ(cx - gap, cy - r * 1.3, r)), s.rect(0, cy - r * 0.4, 1, 1)),
-  s.and(s.circ(cx + gap, cy - r * 0.6, r), s.not(s.circ(cx + gap, cy - r * 1.3, r)), s.rect(0, cy - r * 0.4, 1, 1)));
-const dots = (s: Shapes, pts: readonly (readonly [number, number])[], r: number): Shape => s.or(...pts.map(([x, y]) => s.circ(x, y, r)));
-const stars = (s: Shapes, pts: readonly (readonly [number, number, number])[]): Shape => s.or(...pts.map(([x, y, r]) => s.star(x, y, r)));
-const sparkle = (s: Shapes, x: number, y: number, r: number): Shape => s.or(s.rect(x - r, y - .02, x + r, y + .02), s.rect(x - .02, y - r, x + .02, y + r));
-/** "z" for sleepy things. */
-const zee = (s: Shapes, x: number, y: number, r: number): Shape =>
-  s.or(s.rect(x - r, y - r - .02, x + r, y - r + .02), s.line(x + r, y - r, x - r, y + r, .045), s.rect(x - r, y + r - .02, x + r, y + r + .02));
-/** A rain streak one pixel wide on a 30 grid: (x, y) in pixels so it lands on pixel centres. */
-const streak = (s: Shapes, x: number, y: number): Shape => s.rect((x + .5) / 30 - .017, (y + .5) / 30 - .05, (x + .5) / 30 + .017, (y + .5) / 30 + .05);
+export type { ContentPicture } from './shapes';
 
 export const PICTURES_21_60: readonly ContentPicture[] = [
   // 21 (relaxed)

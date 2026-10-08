@@ -15,7 +15,7 @@ Installed runtime packages: `three`, `@capacitor/core`, `@capacitor/app`, `@capa
 | Module | Path | Job |
 | --- | --- | --- |
 | Engine | `src/engine/` | Rules, generator, solver, real-time `Game` with boosters. Pure, deterministic, no DOM. |
-| Content | `src/content/` | Level 1–60 data (1–20 tuned in the engine, 21–60 shipped as level files), endless levels 61+, level metadata, intro cards. Internal level editor (`editor.html`). |
+| Content | `src/content/` | Level 1–100 data (1–20 tuned in the engine, 21–100 shipped as level files in packs), endless levels 101+, level metadata, intro cards. Internal level editor (`editor.html`). |
 | Meta | `src/meta/` | The player's saved profile: coins, lives timer, boosters, progress, Sticker Book, daily gift, settings, purchase flags, ad bookkeeping, economy numbers. |
 | Services | `src/services/` | Ads (AdMob), purchases (RevenueCat), remote config, analytics, platform (splash, back button, pause). Web builds use built-in mocks. |
 | Audio | `src/audio/` | Synthesised sound effects (Web Audio, no files), a gentle music loop, haptics. Maps engine events to sound + haptics. |

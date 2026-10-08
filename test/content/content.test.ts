@@ -3,15 +3,15 @@
 import { describe, expect, it } from 'vitest';
 import { BOOSTER_KEYS, type IntroKey } from '../../src/app/contracts';
 import { content, LEVEL_FILES, SHIPPED } from '../../src/content';
-import { contentParams, FIRST_FILE_LEVEL, LAST_FILE_LEVEL } from '../../src/content/params';
-import { PICTURES_21_60 } from '../../src/content/pictures';
+import { contentParams, FIRST_FILE_LEVEL, LAST_FILE_LEVEL, packOf, PACKS } from '../../src/content/params';
+import { FILE_PICTURES } from '../../src/content/recipes';
 import { AMMO, apply, colorsOf, Game, needSlots, raster, start, validate, type Level, type Move, type Picture, type State } from '../../src/engine';
 
-const SHIPPED_LEVELS = Array.from({ length: 60 }, (_, i) => i + 1);
+const SHIPPED_LEVELS = Array.from({ length: 100 }, (_, i) => i + 1);
 const pxKey = (p: { w: number; h: number; px: Uint8Array }) => `${p.w}x${p.h}:` + Array.from(p.px, c => c.toString(36)).join('');
 
 // Take the cheap pictures before anything builds a level, so levelPicture can't reuse a built level.
-const SAMPLES = [1, 7, 18, 20, 21, 22, 35, 47, 60, 61, 62, 63, 64, 75, 100];
+const SAMPLES = [1, 7, 18, 20, 21, 22, 35, 47, 60, 61, 62, 78, 100, 101, 102, 103, 104, 115, 140];
 const cheap = new Map<number, Picture>(SAMPLES.map(n => [n, content.levelPicture(n)]));
 
 /** Replay a solver plan in the real-time game, one Purrlet (or linked pair) at a time, checking every state. */
@@ -32,9 +32,9 @@ function replay(L: Level, plan: Move[]): void {
 }
 
 describe('shipped levels', () => {
-  it('ships 60 levels', () => {
-    expect(SHIPPED).toBe(60);
-    expect(content.shipped).toBe(60);
+  it('ships 100 levels', () => {
+    expect(SHIPPED).toBe(100);
+    expect(content.shipped).toBe(100);
   });
 
   describe.each(SHIPPED_LEVELS)('level %i', n => {
@@ -77,30 +77,41 @@ describe('shipped levels', () => {
     expect(content.getLevel(3)).toBe(content.getLevel(3));
   });
 
-  it('has unique names and unique pictures across 1-60', () => {
+  it('has unique names and unique pictures across 1-100', () => {
     const names = SHIPPED_LEVELS.map(n => content.levelMeta(n).name);
-    expect(new Set(names).size).toBe(60);
+    expect(new Set(names).size).toBe(100);
     const pics = SHIPPED_LEVELS.map(n => pxKey(content.levelPicture(n)));
-    expect(new Set(pics).size).toBe(60);
+    expect(new Set(pics).size).toBe(100);
     for (const n of SHIPPED_LEVELS) expect(content.levelMeta(n).name).toBe(content.getLevel(n).name);
   });
 });
 
-describe('level files 21-60', () => {
+describe('level files 21-100', () => {
+  it('comes in back-to-back packs from level 21', () => {
+    expect(PACKS[0]!.first).toBe(21);
+    PACKS.forEach((p, i) => {
+      expect(p.last).toBeGreaterThan(p.first);
+      if (i > 0) expect(p.first).toBe(PACKS[i - 1]!.last + 1);
+    });
+    expect(packOf(60)).toMatchObject({ index: 0, t: 1 });
+    expect(packOf(61)).toMatchObject({ index: 1, t: 0 });
+    expect(() => packOf(LAST_FILE_LEVEL + 1)).toThrow();
+  });
+
   it('has one file per level, in order', () => {
     expect(LEVEL_FILES.map(f => f.n)).toEqual(Array.from({ length: LAST_FILE_LEVEL - FIRST_FILE_LEVEL + 1 }, (_, i) => FIRST_FILE_LEVEL + i));
   });
 
   it('matches the picture recipes (rerun tools/levels.ts after changing a picture)', () => {
     LEVEL_FILES.forEach((f, i) => {
-      const def = PICTURES_21_60[i]!;
+      const def = FILE_PICTURES[i]!;
       expect(f.name).toBe(def.name);
       expect(pxKey(content.levelPicture(f.n))).toBe(pxKey(raster(def, def.size)));
     });
   });
 
   it('keeps full-background pictures full and the generator knobs in range', () => {
-    PICTURES_21_60.forEach((def, i) => {
+    FILE_PICTURES.forEach((def, i) => {
       const n = FIRST_FILE_LEVEL + i, P = contentParams(n, def);
       if (def.bg) expect(raster(def, def.size).px.every(c => c > 0)).toBe(true);
       expect(P.size).toBe(def.size);
@@ -111,8 +122,8 @@ describe('level files 21-60', () => {
   });
 
   it('gets harder on spicy levels and relaxes right after', () => {
-    for (let n = 25; n <= 60; n += 5) {
-      const spicy = content.getLevel(n).need!, before = content.getLevel(n - 1).need!, after = content.getLevel(n + 1 <= 60 ? n + 1 : n - 4).need!;
+    for (let n = 25; n <= LAST_FILE_LEVEL; n += 5) {
+      const spicy = content.getLevel(n).need!, before = content.getLevel(n - 1).need!, after = content.getLevel(n < LAST_FILE_LEVEL ? n + 1 : n - 4).need!;
       expect(spicy).toBeGreaterThan(before);
       expect(spicy).toBeGreaterThan(after);
     }
@@ -132,7 +143,7 @@ describe('levelMeta', () => {
   it('marks spicy levels, intro cards and booster unlocks', () => {
     const intros: Record<number, IntroKey> = { 1: 'basics', 2: 'tray', 5: 'spicy', 7: 'mystery', 12: 'linked', 18: 'background' };
     const unlocks = { 4: 'slot', 6: 'shuffle', 9: 'nap', 13: 'xray' } as const;
-    for (let n = 1; n <= 80; n++) {
+    for (let n = 1; n <= 120; n++) {
       const m = content.levelMeta(n);
       expect(m.n).toBe(n);
       expect(m.spicy).toBe(n % 5 === 0);

@@ -10,7 +10,7 @@ Lines marked **REPLACE BEFORE RELEASE** need your details.
 | App name (both stores) | Pixel Purr: Cosy Colour Puzzle | 30 |
 | App Store subtitle | Paint pixel art with kittens | 30 |
 | Play short description | Tap paint-pot kittens to fill cute pixel pictures. Calm, cosy, no rush. | 80 |
-| App Store promotional text | 60 cosy pictures to paint with the Purrlets. A new daily gift every day, and no timers: think as long as you like. | 170 |
+| App Store promotional text | 100 cosy pictures to paint with the Purrlets. A new daily gift every day, and no timers: think as long as you like. | 170 |
 | Home screen name | Pixel Purr | 12 (iOS shows about 12) |
 
 ## App Store keywords [100]
@@ -31,7 +31,7 @@ Tap a Purrlet and it hops onto the conveyor belt that runs around a pixel pictur
 Easy to start, satisfying to master. Pick the right kitten at the right time, keep the cushions free, and watch the picture bloom.
 
 WHY YOU'LL LOVE IT
-• 60 hand-tuned pictures: lattes, sushi, sakura, a sleepy panda, a goldfish, a rocket trip and more
+• 100 hand-tuned pictures: lattes, sushi, a sleepy panda, a goldfish, a lighthouse, a dream castle and more
 • Calm play with no timers. Take a break and come back any time
 • Every level can be solved. The game checks each one before it ships
 • Mystery Purrlets, linked pairs and spicy levels keep things fresh
@@ -49,7 +49,7 @@ Pixel Purr is free to play. It contains optional in-app purchases (coin packs, b
 ## What's New (first release) [4000]
 
 ```
-Hello from the Purrlets! 60 pictures to paint, a daily gift, and four cosy boosters. We'd love to hear what you think.
+Hello from the Purrlets! 100 pictures to paint, a daily gift, and four cosy boosters. We'd love to hear what you think.
 ```
 
 ## Categories and ratings
@@ -90,7 +90,7 @@ Suggested set, in order, each with a one-line caption on top in Lilita One:
 2. The win dance with confetti and the finished picture — "Fill the picture to win"
 3. The tray with two napping Purrlets — "No rush. Kittens nap until you need them"
 4. The booster bar with X-Ray Specs glowing — "Cosy boosters when you're stuck"
-5. The sticker book with a dozen pictures — "Collect 60 cute pictures"
+5. The sticker book with a dozen pictures — "Collect 100 cute pictures"
 6. The daily gift ladder — "A gift every day"
 
 `tools/dev/store-shots.cjs` takes this set from the real game in headless Chromium: with `npm run dev` running, `node tools/dev/store-shots.cjs http://localhost:5173/ store-shots` writes the App Store 6.9" set (`ios/`), the Play set and the feature graphic (`play/`), and the raw phone captures (`raw/`). The captions and the feature graphic are drawn by `dev/store.html`. Retake them from a simulator before release if the app changes; `window.__pp` in the browser console can jump to any level.

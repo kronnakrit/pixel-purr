@@ -3,7 +3,7 @@
 // lands in the band, then prove it with the solver and measure how often a naive player fails.
 import { assemble, deal, measure, needSlots, paramsFor, RULES, solve, type Level, type LevelParams, type Picture } from '../engine';
 import { contentParams, FIRST_FILE_LEVEL, LAST_FILE_LEVEL } from '../content/params';
-import { PICTURES_21_60 } from '../content/pictures';
+import { recipeFor } from '../content/recipes';
 
 export interface GenParams {
   /** Level number: sets the spicy flag and the file's n. */
@@ -24,9 +24,9 @@ export interface GenParams {
 
 export interface GenResult { level: Level; need: number; fail: number; inBand: boolean; tried: number; ms: number }
 
-/** The knobs a level number would get in the game (content params for 21-60, the engine's curve otherwise). */
+/** The knobs a level number would get in the game (content params for 21-100, the engine's curve otherwise). */
 export function presetFor(n: number): Omit<GenParams, 'seed' | 'tries' | 'adapt'> {
-  const P = n >= FIRST_FILE_LEVEL && n <= LAST_FILE_LEVEL ? contentParams(n, PICTURES_21_60[n - FIRST_FILE_LEVEL]!) : paramsFor(n);
+  const P = n >= FIRST_FILE_LEVEL && n <= LAST_FILE_LEVEL ? contentParams(n, recipeFor(n)) : paramsFor(n);
   return { n, queues: P.queues, shooters: P.shooters, disorder: round2(P.disorder), hidden: round2(P.hidden), links: P.links, need: [P.need[0], P.need[1]] };
 }
 

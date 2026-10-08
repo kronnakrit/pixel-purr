@@ -1,13 +1,14 @@
-// Content: the 60 shipped levels (1-20 tuned in the engine, 21-60 from level files), endless levels 61+,
+// Content: the 100 shipped levels (1-20 tuned in the engine, 21-100 from level files in packs), endless levels 101+,
 // level names, intro cards and booster unlock levels. Every built level and picture is cached in memory.
 import type { BoosterKey, ContentApi, IntroKey, LevelMeta } from '../app/contracts';
 import { fromFile, hash, level, paramsFor, PICTURES, raster, recolor, solve, sprite, V1_COUNT, type Level, type LevelFileV1, type Picture } from '../engine';
-import FILES from './levels-21-60.json';
+import PACK_21_60 from './levels-21-60.json';
+import PACK_61_100 from './levels-61-100.json';
 import { contentParams, FIRST_FILE_LEVEL, LAST_FILE_LEVEL } from './params';
 
 export const SHIPPED = LAST_FILE_LEVEL;
-/** Level files for 21-60, in order (written by tools/levels.ts). */
-export const LEVEL_FILES = FILES as unknown as readonly LevelFileV1[];
+/** Level files for 21-100, in order, one JSON file per pack (written by tools/levels.ts). */
+export const LEVEL_FILES = [...PACK_21_60, ...PACK_61_100] as unknown as readonly LevelFileV1[];
 
 export const INTROS: Readonly<Record<number, IntroKey>> = { 1: 'basics', 2: 'tray', 5: 'spicy', 7: 'mystery', 12: 'linked', 18: 'background' };
 export const UNLOCKS: Readonly<Record<number, BoosterKey>> = { 4: 'slot', 6: 'shuffle', 9: 'nap', 13: 'xray' };
@@ -38,7 +39,7 @@ export function endlessPicture(n: number): Picture {
   return h % 3 === 0 ? sprite(h, N) : recolor(raster(PICTURES[h % PICTURES.length]!, N), h);
 }
 
-/** A shipped level 21-60: replay its file, restore its generator knobs and prove it with the solver once. */
+/** A shipped level 21-100: replay its file, restore its generator knobs and prove it with the solver once. */
 function fileLevel(n: number): Level {
   const f = fileFor(n), L = fromFile(f);
   L.P = contentParams(n, { size: f.w, bg: !f.picture.includes('0') });

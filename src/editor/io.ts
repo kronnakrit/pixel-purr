@@ -17,7 +17,7 @@ export function download(name: string, text: string): void {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-/** Parse one LevelFileV1 (or pick from an array, e.g. levels-21-60.json, by level number). Throws on bad files. */
+/** Parse one LevelFileV1 (or pick from an array, e.g. levels-61-100.json, by level number). Throws on bad files. */
 export function parseLevel(text: string, preferN?: number): { n: number; level: Level } {
   const data = JSON.parse(text) as LevelFileV1 | LevelFileV1[];
   const files = Array.isArray(data) ? data : [data];

@@ -13,7 +13,7 @@ const SHOTS = [
   ['win', 'Fill the picture to win'],
   ['tray', 'No rush. Kittens nap until you need them'],
   ['boosters', "Cosy boosters when you're stuck"],
-  ['stickers', 'Collect 60 cute pictures'],
+  ['stickers', 'Collect 100 cute pictures'],
   ['daily', 'A gift every day'],
 ];
 const GL = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'];

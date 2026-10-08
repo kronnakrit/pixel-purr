@@ -4,7 +4,8 @@ import '../fonts';
 import './editor.css';
 import { colorsOf, countPixels, measure, PALETTE, paramsFor, PICTURES, raster, solve, type Level, type Picture } from '../engine';
 import { content } from '../content';
-import { PICTURES_21_60 } from '../content/pictures';
+import { FIRST_FILE_LEVEL, LAST_FILE_LEVEL, PACKS } from '../content/params';
+import { FILE_PICTURES } from '../content/recipes';
 import { button, h, numField, section, toast } from './dom';
 import { generate, presetFor, type GenParams, type GenResult } from './generate';
 import { copyText, download, levelJson, parseLevel, pictureFromImage, readFile } from './io';
@@ -35,7 +36,7 @@ const header = h('header.top', {},
   h('div.grow'),
   h('label.field', {}, h('span', { text: 'Name' }), nameInput),
   nField.el,
-  button('Import JSON', () => importInput.click(), 'blue', 'Load a LevelFileV1 (or levels-21-60.json, picks the level number)'),
+  button('Import JSON', () => importInput.click(), 'blue', 'Load a LevelFileV1 (or a pack such as levels-61-100.json, picks the level number)'),
   button('Copy JSON', () => void exportJson(false), '', 'Copy the generated level as LevelFileV1'),
   button('Download', () => void exportJson(true), 'go', 'Save the generated level as a .json file'),
   importInput);
@@ -44,7 +45,8 @@ const header = h('header.top', {},
 
 const libSelect = h('select', { title: 'Library pictures' },
   h('optgroup', { label: 'Levels 1-20' }, ...PICTURES.map((p, i) => h('option', { value: `e${i}`, text: `${i + 1} · ${p.name}` }))),
-  h('optgroup', { label: 'Levels 21-60' }, ...PICTURES_21_60.map((p, i) => h('option', { value: `c${i}`, text: `${i + 21} · ${p.name}` }))));
+  ...PACKS.map(k => h('optgroup', { label: `Levels ${k.first}-${k.last}` }, ...FILE_PICTURES.slice(k.first - FIRST_FILE_LEVEL, k.last - FIRST_FILE_LEVEL + 1)
+    .map((p, j) => h('option', { value: `c${k.first - FIRST_FILE_LEVEL + j}`, text: `${k.first + j} · ${p.name}` })))));
 const sizeInput = h('input', { type: 'range', min: 12, max: 32, step: 1, value: 24 });
 const sizeLabel = h('b', { text: '24' });
 sizeInput.addEventListener('input', () => { paint.resize(Number(sizeInput.value)); sizeLabel.textContent = sizeInput.value; onPictureEdited(); });
@@ -56,7 +58,7 @@ const loadN = numField('Game level', 1, { min: 1, max: 999 });
 
 const picturePanel = section('Picture',
   h('div.row', {}, libSelect, button('Use', () => useLibrary(), 'blue')),
-  h('div.row', {}, loadN.el, button('Load game level', () => loadGameLevel(loadN.get()), '', 'Picture, queues and solution of a level from the game (1-60 shipped, 61+ endless)')),
+  h('div.row', {}, loadN.el, button('Load game level', () => loadGameLevel(loadN.get()), '', `Picture, queues and solution of a level from the game (1-${LAST_FILE_LEVEL} shipped, ${LAST_FILE_LEVEL + 1}+ endless)`)),
   h('div.row', {}, h('label.field', { style: 'flex:1' }, h('span', {}, 'Grid size ', sizeLabel), sizeInput)),
   h('div.row', {}, h('label.field', { style: 'flex:1' }, h('span', {}, 'Import PNG · max colours ', kLabel), kInput, pngInput)));
 
@@ -244,7 +246,7 @@ function onPictureEdited(): void { showPictureStats(); }
 function useLibrary(): void {
   const v = libSelect.value, i = Number(v.slice(1));
   if (v[0] === 'e') { const n = i + 1; setPicture(raster(PICTURES[i]!, paramsFor(n).size)); nField.set(levelN = n); }
-  else { const d = PICTURES_21_60[i]!; setPicture(raster(d, d.size)); nField.set(levelN = i + 21); }
+  else { const d = FILE_PICTURES[i]!; setPicture(raster(d, d.size)); nField.set(levelN = i + FIRST_FILE_LEVEL); }
   applyPreset();
   showTab('picture');
 }
@@ -254,7 +256,7 @@ function loadGameLevel(n: number): void {
     const L = content.getLevel(n);
     setPicture({ w: L.w, h: L.h, px: L.px, name: L.name });
     nField.set(levelN = n);
-    if (n <= 60) libSelect.value = n <= 20 ? `e${n - 1}` : `c${n - 21}`;
+    if (n <= LAST_FILE_LEVEL) libSelect.value = n < FIRST_FILE_LEVEL ? `e${n - 1}` : `c${n - FIRST_FILE_LEVEL}`;
     applyPreset(true);
     result = null;
     setLevel(L, `game level ${n}`);
