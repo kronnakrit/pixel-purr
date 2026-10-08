@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#2A1F4A" />
+  <title>Purrlet Lab</title>
+  <style>
+    :root { --ink: #24193F; --cream: #FBF6FF; --muted: #BFAEE6; --gold: #FFC93B; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; color: var(--cream); user-select: none; -webkit-user-select: none;
+      background: linear-gradient(#4A3A96, #33276F 55%, #231A4F); font-family: 'Nunito', system-ui, sans-serif; }
+    #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    #bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 12px calc(env(safe-area-inset-bottom) + 10px);
+      display: flex; flex-direction: column; gap: 6px; background: linear-gradient(transparent, rgba(20, 13, 48, .7) 30%); }
+    .row { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; align-items: center; }
+    .lbl { font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); width: 100%; text-align: center; }
+    button { font: inherit; font-weight: 900; font-size: 13px; color: #fff; background: linear-gradient(#5AA2FF, #2D63D8); border: 2px solid var(--ink);
+      border-radius: 12px; height: 32px; padding: 0 10px; box-shadow: 0 3px 0 var(--ink); }
+    button.on { background: linear-gradient(#7EE07A, #3DAA4A); }
+    button.act { background: linear-gradient(#FF7EC8, #D6449A); }
+    button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+    #info { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 12px; right: 12px; display: flex; justify-content: space-between;
+      font-size: 12px; font-weight: 800; color: var(--muted); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <div id="info"><span id="title">Purrlet lab</span><span id="stats"></span></div>
+  <div id="bar">
+    <div class="row" id="moods"></div>
+    <div class="row" id="acts"></div>
+    <div class="row" id="opts"></div>
+  </div>
+  <script type="module" src="../src/render/purrlet/dev.ts"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pixel Purr</string>
+    <string name="title_activity_main">Pixel Purr</string>
+    <string name="package_name">com.kronnakrit.pixelpurr</string>
+    <string name="custom_url_scheme">com.kronnakrit.pixelpurr</string>
+    <!-- AdMob app id (src/services/config.ts). REPLACE BEFORE RELEASE: your AdMob Android app id (with "~").
+         This is Google's test app id. -->
+    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
+</resources>

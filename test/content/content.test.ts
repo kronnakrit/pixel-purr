@@ -1,0 +1,186 @@
+// Content: every shipped level loads, keeps the rules, is proven solvable and sits in its difficulty band;
+// pictures and names are unique; the cheap picture path matches the built levels; metadata and intro cards.
+import { describe, expect, it } from 'vitest';
+import { BOOSTER_KEYS, type IntroKey } from '../../src/app/contracts';
+import { content, LEVEL_FILES, SHIPPED } from '../../src/content';
+import { contentParams, FIRST_FILE_LEVEL, LAST_FILE_LEVEL, packOf, PACKS } from '../../src/content/params';
+import { FILE_PICTURES } from '../../src/content/recipes';
+import { AMMO, apply, colorsOf, Game, needSlots, raster, start, validate, type Level, type Move, type Picture, type State } from '../../src/engine';
+
+const SHIPPED_LEVELS = Array.from({ length: 100 }, (_, i) => i + 1);
+const pxKey = (p: { w: number; h: number; px: Uint8Array }) => `${p.w}x${p.h}:` + Array.from(p.px, c => c.toString(36)).join('');
+
+// Take the cheap pictures before anything builds a level, so levelPicture can't reuse a built level.
+const SAMPLES = [1, 7, 18, 20, 21, 22, 35, 47, 60, 61, 62, 78, 100, 101, 102, 103, 104, 115, 140];
+const cheap = new Map<number, Picture>(SAMPLES.map(n => [n, content.levelPicture(n)]));
+
+/** Replay a solver plan in the real-time game, one Purrlet (or linked pair) at a time, checking every state. */
+function replay(L: Level, plan: Move[]): void {
+  const g = new Game(L);
+  let st: State = start(L);
+  for (const m of plan) {
+    const ev = m.kind === 'q' ? g.launchQueue(m.qs[0]!) : g.launchTray(m.i);
+    expect(ev.length).toBeGreaterThan(0);
+    g.settle();
+    st = apply(L, st, m);
+    expect(st.tray.length).toBeLessThanOrEqual(L.tray);
+    expect(g.left).toBe(st.left);
+    expect(g.tray.map(t => [t.c, t.a])).toEqual(st.tray.map(t => [t.c, t.a]));
+  }
+  expect(st.left).toBe(0);
+  expect(g.status).toBe('won');
+}
+
+describe('shipped levels', () => {
+  it('ships 100 levels', () => {
+    expect(SHIPPED).toBe(100);
+    expect(content.shipped).toBe(100);
+  });
+
+  describe.each(SHIPPED_LEVELS)('level %i', n => {
+    const L = content.getLevel(n);
+
+    it('keeps paint conservation, ammo bounds and fair starts', () => {
+      expect(() => validate(L)).not.toThrow();
+      for (const q of L.queues) {
+        for (const s of q) expect(s.a).toBeLessThanOrEqual(AMMO.max);
+        expect(q[0]?.hidden).toBeFalsy(); // mystery Purrlets never start at the front
+      }
+      expect(L.queues.length).toBeGreaterThanOrEqual(2);
+      if (n > 20) expect(L.intro).toBeNull();
+    });
+
+    it('is proven solvable at load and the plan clears it in the real-time game', () => {
+      expect(L.solution?.ok).toBe(true);
+      expect(L.solution!.nodes).toBeLessThanOrEqual(4000);
+      replay(L, L.solution!.plan!);
+    });
+
+    it('needs a number of tray slots inside its band', () => {
+      const need = needSlots(L, 2000);
+      expect(need).toBe(L.need);
+      expect(need).toBeGreaterThanOrEqual(L.P.need[0]);
+      expect(need).toBeLessThanOrEqual(L.P.need[1]);
+    });
+
+    it('has a 24-32 picture with 2-7 colours (3+ from level 21)', () => {
+      const cols = colorsOf(L.px).length;
+      expect(cols).toBeLessThanOrEqual(7);
+      expect(cols).toBeGreaterThanOrEqual(n > 20 ? 3 : 2);
+      if (n > 20) expect(L.w).toBeGreaterThanOrEqual(24);
+      expect(L.w).toBeLessThanOrEqual(32);
+    });
+  });
+
+  it('caches built levels', () => {
+    expect(content.getLevel(33)).toBe(content.getLevel(33));
+    expect(content.getLevel(3)).toBe(content.getLevel(3));
+  });
+
+  it('has unique names and unique pictures across 1-100', () => {
+    const names = SHIPPED_LEVELS.map(n => content.levelMeta(n).name);
+    expect(new Set(names).size).toBe(100);
+    const pics = SHIPPED_LEVELS.map(n => pxKey(content.levelPicture(n)));
+    expect(new Set(pics).size).toBe(100);
+    for (const n of SHIPPED_LEVELS) expect(content.levelMeta(n).name).toBe(content.getLevel(n).name);
+  });
+});
+
+describe('level files 21-100', () => {
+  it('comes in back-to-back packs from level 21', () => {
+    expect(PACKS[0]!.first).toBe(21);
+    PACKS.forEach((p, i) => {
+      expect(p.last).toBeGreaterThan(p.first);
+      if (i > 0) expect(p.first).toBe(PACKS[i - 1]!.last + 1);
+    });
+    expect(packOf(60)).toMatchObject({ index: 0, t: 1 });
+    expect(packOf(61)).toMatchObject({ index: 1, t: 0 });
+    expect(() => packOf(LAST_FILE_LEVEL + 1)).toThrow();
+  });
+
+  it('has one file per level, in order', () => {
+    expect(LEVEL_FILES.map(f => f.n)).toEqual(Array.from({ length: LAST_FILE_LEVEL - FIRST_FILE_LEVEL + 1 }, (_, i) => FIRST_FILE_LEVEL + i));
+  });
+
+  it('matches the picture recipes (rerun tools/levels.ts after changing a picture)', () => {
+    LEVEL_FILES.forEach((f, i) => {
+      const def = FILE_PICTURES[i]!;
+      expect(f.name).toBe(def.name);
+      expect(pxKey(content.levelPicture(f.n))).toBe(pxKey(raster(def, def.size)));
+    });
+  });
+
+  it('keeps full-background pictures full and the generator knobs in range', () => {
+    FILE_PICTURES.forEach((def, i) => {
+      const n = FIRST_FILE_LEVEL + i, P = contentParams(n, def);
+      if (def.bg) expect(raster(def, def.size).px.every(c => c > 0)).toBe(true);
+      expect(P.size).toBe(def.size);
+      expect(P.need[0]).toBeLessThanOrEqual(P.need[1]);
+      expect(P.queues).toBe(n % 5 === 0 ? 2 : P.queues);
+      expect(content.getLevel(n).P).toEqual(P); // the app restores the same knobs from the file alone
+    });
+  });
+
+  it('gets harder on spicy levels and relaxes right after', () => {
+    for (let n = 25; n <= LAST_FILE_LEVEL; n += 5) {
+      const spicy = content.getLevel(n).need!, before = content.getLevel(n - 1).need!, after = content.getLevel(n < LAST_FILE_LEVEL ? n + 1 : n - 4).need!;
+      expect(spicy).toBeGreaterThan(before);
+      expect(spicy).toBeGreaterThan(after);
+    }
+  });
+});
+
+describe('levelPicture', () => {
+  it.each(SAMPLES)('level %i: the cheap picture equals the built level', n => {
+    const p = cheap.get(n)!, L = content.getLevel(n);
+    expect(p.name).toBe(L.name);
+    expect(pxKey(p)).toBe(pxKey(L));
+    expect(content.levelMeta(n).name).toBe(L.name);
+  });
+});
+
+describe('levelMeta', () => {
+  it('marks spicy levels, intro cards and booster unlocks', () => {
+    const intros: Record<number, IntroKey> = { 1: 'basics', 2: 'tray', 5: 'spicy', 7: 'mystery', 12: 'linked', 18: 'background' };
+    const unlocks = { 4: 'slot', 6: 'shuffle', 9: 'nap', 13: 'xray' } as const;
+    for (let n = 1; n <= 120; n++) {
+      const m = content.levelMeta(n);
+      expect(m.n).toBe(n);
+      expect(m.spicy).toBe(n % 5 === 0);
+      expect(m.intro).toBe(intros[n] ?? null);
+      expect(m.unlocks).toBe(unlocks[n as keyof typeof unlocks] ?? null);
+      expect(m.name.length).toBeGreaterThan(0);
+    }
+    expect(Object.values(unlocks).sort()).toEqual([...BOOSTER_KEYS].sort());
+  });
+
+  it('each intro level shows its mechanic', () => {
+    const has: Record<IntroKey, (L: Level) => boolean> = {
+      basics: () => true,
+      tray: L => L.tray > 0,
+      spicy: L => L.P.spicy,
+      mystery: L => L.queues.some(q => q.some(p => p.hidden && p.d > 0)),
+      linked: L => L.queues.some(q => q.some(p => p.link !== undefined)),
+      background: L => !L.px.includes(0),
+    };
+    for (let n = 1; n <= 20; n++) {
+      const k = content.levelMeta(n).intro;
+      if (k) expect(has[k](content.getLevel(n)), `level ${n} (${k})`).toBe(true);
+    }
+  });
+
+  it('rejects bad level numbers', () => {
+    expect(() => content.levelMeta(0)).toThrow();
+    expect(() => content.getLevel(1.5)).toThrow();
+  });
+});
+
+describe('introCard', () => {
+  it.each(['basics', 'tray', 'spicy', 'mystery', 'linked', 'background'] as IntroKey[])('%s has a short title and a one-sentence body', k => {
+    const c = content.introCard(k);
+    expect(c.title.length).toBeGreaterThan(3);
+    expect(c.title.length).toBeLessThanOrEqual(24);
+    expect(c.body).toMatch(/^[A-Z][^.!?]*[.!]$/);
+    expect(c.body.length).toBeLessThanOrEqual(120);
+  });
+});
