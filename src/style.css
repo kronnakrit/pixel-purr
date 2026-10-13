@@ -1,0 +1,25 @@
+/* Global page: the purple stage behind a transparent play-field canvas, with the UI layered on top.
+   Phone-app feel: no zoom, no overscroll bounce, no text selection, no tap highlight, no long-press callouts. */
+:root { color-scheme: dark; background: #231A4F; }
+*, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; width: 100%; height: 100%; overflow: hidden;
+  overscroll-behavior: none; touch-action: manipulation; /* no double-tap zoom; inner scrollers still pan */
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-text-size-adjust: 100%;
+  color: #fff; font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Fixed body: iOS can't rubber-band the page. The stage gradient and its faint rotated pixel squares sit behind
+   everything (the WebGL canvas is transparent). */
+body { position: fixed; inset: 0; background: linear-gradient(#4A3A96, #33276F 55%, #231A4F) fixed; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='390' height='844'%3E%3Cg fill='%23fff' fill-opacity='.055'%3E%3Crect x='14' y='18' width='7' height='7' rx='1.5' transform='rotate(8 17.5 21.5)'/%3E%3Crect x='111' y='191' width='8' height='8' rx='1.5' transform='rotate(21 115 195)'/%3E%3Crect x='208' y='364' width='9' height='9' rx='1.5' transform='rotate(34 212.5 368.5)'/%3E%3Crect x='305' y='537' width='7' height='7' rx='1.5' transform='rotate(47 308.5 540.5)'/%3E%3Crect x='40' y='710' width='8' height='8' rx='1.5' transform='rotate(60 44 714)'/%3E%3Crect x='137' y='75' width='9' height='9' rx='1.5' transform='rotate(73 141.5 79.5)'/%3E%3Crect x='234' y='248' width='7' height='7' rx='1.5' transform='rotate(86 237.5 251.5)'/%3E%3Crect x='331' y='421' width='8' height='8' rx='1.5' transform='rotate(99 335 425)'/%3E%3Crect x='66' y='594' width='9' height='9' rx='1.5' transform='rotate(112 70.5 598.5)'/%3E%3Crect x='163' y='767' width='7' height='7' rx='1.5' transform='rotate(125 166.5 770.5)'/%3E%3Crect x='260' y='132' width='8' height='8' rx='1.5' transform='rotate(138 264 136)'/%3E%3Crect x='357' y='305' width='9' height='9' rx='1.5' transform='rotate(151 361.5 309.5)'/%3E%3Crect x='92' y='478' width='7' height='7' rx='1.5' transform='rotate(164 95.5 481.5)'/%3E%3Crect x='189' y='651' width='8' height='8' rx='1.5' transform='rotate(177 193 655)'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 390px 844px;
+}
+
+#stage { position: fixed; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+#ui { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+
+img, svg, canvas { -webkit-user-drag: none; }

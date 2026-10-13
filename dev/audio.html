@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#2A1F4A" />
+  <title>Pixel Purr · sound lab</title>
+  <style>
+    :root { --ink: #24193F; --cream: #FBF6FF; --muted: #BFAEE6; --gold: #FFC93B; --panel: #2E2368; --panel2: #3A2D86; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; min-height: 100%; color: var(--cream); user-select: none; -webkit-user-select: none; }
+    body { background: linear-gradient(#4A3A96, #33276F 45%, #231A4F) fixed; font: 800 13px/1.25 'Nunito', system-ui, sans-serif;
+      padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 24px); }
+    body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .06;
+      background-image: linear-gradient(45deg, #fff 25%, transparent 25%, transparent 75%, #fff 75%);
+      background-size: 120px 120px; transform: rotate(12deg) scale(1.4); }
+    main { position: relative; max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    h1 { margin: 0; font: 400 30px/1 'Lilita One', sans-serif; color: #fff; letter-spacing: .01em;
+      -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); }
+    .sub { color: var(--muted); font-size: 11px; font-weight: 800; margin-top: 4px; }
+    .chip { font: 400 13px 'Lilita One', sans-serif; padding: 6px 12px; border-radius: 99px; background: #1C1540; border: 2.5px solid var(--ink);
+      color: var(--muted); white-space: nowrap; }
+    .chip.on { color: #7EE07A; }
+    section { background: linear-gradient(var(--panel2), var(--panel)); border: 3px solid var(--ink); border-radius: 20px; padding: 10px 12px 12px;
+      box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255,255,255,.12); }
+    h2 { margin: 0 0 8px; font: 400 15px 'Lilita One', sans-serif; color: var(--gold); letter-spacing: .03em;
+      -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; display: flex; justify-content: space-between; align-items: baseline; }
+    h2 small { font: 800 11px 'Nunito', sans-serif; color: var(--muted); -webkit-text-stroke: 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; }
+    button { font: 900 13px 'Nunito', sans-serif; color: #fff; border: 2.5px solid var(--ink); border-radius: 14px; padding: 7px 12px;
+      background: linear-gradient(#6B5BD0, #4E3FAE); box-shadow: 0 3px 0 var(--ink), inset 0 2px 0 rgba(255,255,255,.18);
+      transition: transform .15s cubic-bezier(.2,.8,.3,1.4); cursor: pointer; }
+    button:active { transform: translateY(3px); box-shadow: 0 0 0 var(--ink); }
+    button.on { background: linear-gradient(#7EE07A, #3DAA4A); text-shadow: 0 1px 0 rgba(36,25,63,.45); }
+    button.off { background: linear-gradient(#5B4F8E, #40366F); color: #C9BEF0; }
+    button.go { background: linear-gradient(#FF7EC8, #D6449A); }
+    button.blue { background: linear-gradient(#5AA2FF, #2D63D8); }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .sfx { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 6px 6px 5px; text-align: left; border-radius: 14px; min-width: 0; }
+    .sfx .head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
+    .sfx em { font: 800 10px 'Nunito', sans-serif; font-style: normal; color: var(--gold); opacity: .9; font-variant-numeric: tabular-nums; }
+    .sfx b { font: 400 14px 'Lilita One', sans-serif; letter-spacing: .02em; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+    .sfx i { font-style: normal; font-size: 10px; color: #E2D9FF; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sfx canvas { width: 100%; height: 22px; display: block; background: rgba(28, 21, 64, .55); border-radius: 7px; }
+    .sfx.bad { background: linear-gradient(#FF8A7A, #D6445A); }
+    .sfx.flash { animation: flash .35s ease-out; }
+    @keyframes flash { 0% { transform: scale(.94); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+    #status { color: var(--muted); font-size: 11px; margin-top: 8px; min-height: 14px; }
+    .tbl { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+    .tbl th { text-align: right; color: var(--muted); font-weight: 900; padding: 3px 4px; border-bottom: 2px solid rgba(36,25,63,.8); }
+    .tbl td { text-align: right; padding: 3px 4px; border-bottom: 1px solid rgba(255,255,255,.07); font-variant-numeric: tabular-nums; }
+    .tbl th:first-child, .tbl td:first-child { text-align: left; }
+    .tbl td.ok { color: #7EE07A; } .tbl td.no { color: #FF8A7A; }
+    .wave-label { color: var(--muted); font-size: 10px; margin-top: 8px; }
+    .music-wave { width: 100%; height: 34px; display: block; background: rgba(28, 21, 64, .55); border-radius: 8px; margin-top: 3px; }
+    #verdict { font: 400 16px 'Lilita One', sans-serif; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+    #verdict.ok { color: #7EE07A; } #verdict.no { color: #FF8A7A; }
+    .note { color: var(--muted); font-size: 11px; font-weight: 700; margin: 6px 0 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div><h1>Sound lab</h1><div class="sub">Pixel Purr · Web Audio synthesis, no files</div></div>
+      <span class="chip" id="state">audio: none</span>
+    </header>
+    <section>
+      <h2>Settings <small>tap anywhere to unlock audio</small></h2>
+      <div class="row" id="toggles"></div>
+    </section>
+    <section>
+      <h2>Music <small id="track">off</small></h2>
+      <div class="row" id="music"></div>
+    </section>
+    <section>
+      <h2>Sound effects <small>tap to play</small></h2>
+      <div class="grid" id="sfx"></div>
+    </section>
+    <section>
+      <h2>Moments <small>engine events → gameEvents</small></h2>
+      <div class="row" id="moments"></div>
+      <div id="status"></div>
+    </section>
+    <section>
+      <h2>Offline check <span id="verdict"></span></h2>
+      <div class="row"><button class="blue" id="check">Render and measure everything</button></div>
+      <p class="note">Each sound and 8 s of each music loop rendered with OfflineAudioContext through the real limiter: peak, audible length, loudness, brightness.</p>
+      <div id="report"></div>
+    </section>
+  </main>
+  <script type="module" src="../src/audio/dev.ts"></script>
+</body>
+</html>

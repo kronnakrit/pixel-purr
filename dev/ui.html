@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#33276F" />
+  <title>Pixel Purr · UI</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; user-select: none; color: #fff; font: 800 13px/1.2 'Nunito', system-ui, sans-serif; }
+    body { background: linear-gradient(#4A3A96, #33276F 55%, #231A4F); }
+    #field { position: fixed; inset: 0; pointer-events: none; }
+    #devbar { position: fixed; left: 50%; bottom: 2px; transform: translateX(-50%); z-index: 50; display: none; gap: 4px; }
+    #devbar.on { display: flex; }
+    #devbar button { font: 800 11px 'Nunito', sans-serif; color: #fff; background: rgba(0, 0, 0, .4); border: 0; border-radius: 8px; padding: 4px 8px; }
+  </style>
+</head>
+<body>
+  <div id="field"></div>
+  <div id="app"></div>
+  <div id="devbar"></div>
+  <script type="module" src="../src/ui/dev.ts"></script>
+</body>
+</html>
