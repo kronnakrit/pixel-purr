@@ -1,5 +1,7 @@
-// Starting a level: lives gate, booster unlock and intro cards; pause, restart, going home, backgrounding, back button.
+// Starting a level: lives gate, booster unlock and intro cards; pause, restart, going home, backgrounding, back button,
+// the help page.
 import { describe, expect, it } from 'vitest';
+import type { HelpInfo } from '../../src/app/contracts';
 import { Harness, make, quickWin, CHERRY, SODA } from './fakes';
 
 /** A level that takes a while: one soda Purrlet rides a long belt around a big board. */
@@ -244,6 +246,69 @@ describe('the coin chip during play', () => {
     expect(h.running).toBe(false);
     h.ui.answer('shop');
     await h.until(() => h.running);
+  });
+});
+
+describe('the help page', () => {
+  it('opens from the "?" over the paused board: every booster, and the rules met so far in level order', async () => {
+    const h = new Harness();
+    h.meta.level = 7;
+    h.meta.unlockBoostersUpTo(7);
+    h.content.custom.set(7, () => slowLevel(7));
+    await h.start();
+    await h.playFromHome();
+    h.scene.tap({ kind: 'queue', q: 0 });
+    await h.run(300);
+    h.ui.hud.helpCb();
+    await h.until(() => h.ui.isOpen('help'));
+    expect(h.analytics.screens.at(-1)).toBe('help');
+    const info = h.ui.last<HelpInfo>('help');
+    expect(info.boosters.map(b => [b.key, b.unlocked, b.count])).toEqual([['slot', true, 3], ['shuffle', true, 3], ['nap', false, 0], ['xray', false, 0]]);
+    expect(info.rules.map(r => r.key)).toEqual(['basics', 'tray', 'spicy', 'mystery']);
+    expect(info.rules[0]).toEqual({ key: 'basics', title: 'title:basics', body: 'body:basics' });
+    const tick = h.game.tick;
+    await h.run(1000);
+    expect(h.game.tick).toBe(tick);
+    h.ui.hud.helpCb(); // a second tap while it is open does nothing
+    await h.run(100);
+    expect(h.ui.count('help')).toBe(1);
+    h.ui.answer('help');
+    await h.run(300);
+    expect(h.game.tick).toBeGreaterThan(tick);
+    expect(h.meta.livesLeft).toBe(5);
+  });
+
+  it('opens over the pause card, and back closes only the help page', async () => {
+    const h = new Harness();
+    h.meta.level = 3;
+    h.content.custom.set(3, () => slowLevel());
+    await h.start();
+    await h.playFromHome();
+    h.ui.hud.pauseCb();
+    await h.until(() => h.ui.isOpen('pause'));
+    h.ui.pauseOpts!.help!();
+    await h.until(() => h.ui.isOpen('help'));
+    h.ui.pauseOpts!.help!();
+    await h.run(100);
+    expect(h.ui.count('help')).toBe(1);
+    expect(h.platform.back()).toBe(true);
+    await h.until(() => !h.ui.isOpen('help'));
+    expect(h.ui.isOpen('pause')).toBe(true);
+    expect(h.running).toBe(false);
+    h.ui.answer('pause', 'resume');
+    await h.until(() => h.running);
+  });
+
+  it('opens from the settings card on home', async () => {
+    const h = await new Harness().start();
+    h.ui.answer('home', 'settings');
+    await h.until(() => h.ui.isOpen('pause'));
+    h.ui.pauseOpts!.help!();
+    await h.until(() => h.ui.isOpen('help'));
+    expect(h.ui.last<HelpInfo>('help').rules.map(r => r.key)).toEqual(['basics']);
+    h.ui.answer('help');
+    h.ui.answer('pause', 'resume');
+    await h.until(() => h.ui.count('home') === 2);
   });
 });
 

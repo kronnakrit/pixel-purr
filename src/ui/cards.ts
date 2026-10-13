@@ -1,7 +1,7 @@
 // Every card modal: intro, booster unlock, win, fail, pause/settings, daily gift, out of lives, offers, buy booster.
 import type { BoosterKey, FailInfo, IntroKey, LivesInfo, OfferInfo, PauseOptions, Reward, Settings, WinInfo } from '../app/contracts';
 import { PALETTE } from '../engine/palette';
-import { ICONS, boosterArt, check, coin, coinPile, flame, hand, heart, infinity, linked, pictureCanvas, purrlet, tray, videoGlyph } from './art';
+import { ICONS, boosterArt, check, coin, coinPile, flame, hand, heart, helpGlyph, infinity, linked, pictureCanvas, purrlet, tray, videoGlyph } from './art';
 import { BOOSTER_INFO } from './boosters';
 import type { Ctx } from './ctx';
 import { art, h, iconBtn, linkBtn, otext, pill, type Tone } from './dom';
@@ -12,6 +12,13 @@ import { actions, copy, panel } from './panel';
 
 const coinIc = (w = 28) => coin(w, '');
 const glow = (inner: HTMLElement, cls = '') => h('div', `pp-glow ${cls}`, inner);
+/** The "?" drawn inline in a sentence, read out as words. */
+function helpMark(): HTMLElement {
+  const m = art(helpGlyph(18), 'pp-inlic');
+  m.setAttribute('role', 'img');
+  m.setAttribute('aria-label', 'the question mark');
+  return m;
+}
 
 // ---------------------------------------------------------------- intro cards
 
@@ -25,7 +32,7 @@ const INTRO_LOOK: Record<IntroKey, { ribbon: string; tone: Tone; art: () => HTML
 };
 
 /** A tiny full-background pixel scene (sky, sun, grass) for the background intro card. */
-function skyArt(): string {
+export function skyArt(): string {
   const N = 12, cells: string[] = [];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const sun = (x - 8.5) ** 2 + (y - 3.5) ** 2 < 5, grass = y > 8 + Math.sin(x * 0.9) * 0.8, cloud = y === 6 && x > 1 && x < 5 || y === 5 && x > 2 && x < 4;
@@ -56,10 +63,11 @@ export function boosterUnlockCard(m: Modals, k: BoosterKey, free: number): Promi
     build: done => {
       const p = panel('New booster!', 'gold', { cls: 'pp-unlock' });
       const demo = k === 'slot' ? art(tray(6, [[1, 20], [5, 10], [9, 30], [4, 10], [6, 20]], 280, true), 'pp-unlock-tray') : null;
-      p.body.append(h('div', 'pp-hero', glow(art(boosterArt(k, 112), 'pp-hero-art pp-bob'))), copy(info.name, info.does));
+      p.body.append(h('div', 'pp-hero', glow(art(boosterArt(k, 112), 'pp-hero-art pp-bob'))), copy(info.name, info.help));
       if (demo) p.body.append(demo);
       p.body.append(
-        actions(pill(free > 0 ? `Claim ${free}` : 'Got it!', 'green', () => done(), { cls: 'pp-primary pp-pulse' })));
+        actions(pill(free > 0 ? `Claim ${free}` : 'Got it!', 'green', () => done(), { cls: 'pp-primary pp-pulse' }),
+          h('p', 'pp-note pp-unlock-hint', 'Forgot what a booster does? ', h('span', 'pp-nowrap', 'Tap ', helpMark()), ' next to your boosters.')));
       return p.el;
     },
   });
@@ -159,7 +167,8 @@ export function pauseCard(m: Modals, ctx: Ctx, mode: 'play' | 'home', s: Setting
         };
         p.body.append(h('div', 'pp-bigrow', big(ICONS.restart(64), 'Restart', 'costs a life', 'restart'), big(ICONS.home(64), 'Home', 'costs a life', 'home')), h('p', 'pp-note', 'Restart or Home costs a life'));
       }
-      p.body.append(actions(pill(mode === 'play' ? 'Resume' : 'Done', 'green', () => done('resume'), { cls: 'pp-primary' })));
+      p.body.append(actions(pill(mode === 'play' ? 'Resume' : 'Done', 'green', () => done('resume'), { cls: 'pp-primary' }),
+        opts.help ? pill('Help', 'purple', () => opts.help?.(), { size: 'm', icon: helpGlyph(28), cls: 'pp-helppill', aria: 'Help: what boosters do and how to play' }) : null));
       // ad consent rules: the player must be able to change their choices at any time
       const links = [
         opts.policy ? linkBtn('Privacy policy', () => { ctx.sfx('button'); opts.policy?.(); }, 'pp-privacy') : null,

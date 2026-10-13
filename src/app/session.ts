@@ -179,6 +179,13 @@ export class Session {
     try { await this.host.shop(); } finally { this.holds--; this.refreshBoosters(); }
   }
 
+  /** "?" at the end of the booster bar: the help page over the paused board. */
+  async help(): Promise<void> {
+    if (!this.running) return;
+    this.holds++;
+    try { await this.host.help(); } finally { this.holds--; }
+  }
+
   /** Leave without a verdict (debug jump to another level). */
   abort(): void { this.end('abort'); }
 

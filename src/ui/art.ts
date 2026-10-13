@@ -159,12 +159,17 @@ export function videoGlyph(w = 26): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 22" width="${w}" height="${((w * 22) / 30).toFixed(1)}" aria-hidden="true"><rect x="1.5" y="1.5" width="27" height="19" rx="5" fill="#fff" stroke="${INK}" stroke-width="2.5"/><path d="M12 6.5 L19.5 11 L12 15.5 Z" fill="#2D63D8"/></svg>`;
 }
 
+/** A "?" in a white disc, for pills that open the help page. */
+export function helpGlyph(w = 26): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${w}" height="${w}" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="#fff" stroke="${INK}" stroke-width="2.5"/><path d="M8.7 9.3 A3.4 3.4 0 1 1 13.5 12.4 Q12 13.2 12 15" fill="none" stroke="#5B2FC0" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="18.3" r="1.7" fill="#5B2FC0"/></svg>`;
+}
+
 export function check(w = 22): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${w}" height="${w}" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="#5FCB5A" stroke="${INK}" stroke-width="2.5"/><path d="M7 12.5 l3.4 3.4 L17 9" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
 export type IconKey = 'settings' | 'pause' | 'plus' | 'back' | 'close' | 'sound' | 'music' | 'vibrate' | 'motion' | 'lock'
-  | 'home' | 'shop' | 'stickers' | 'trophy' | 'gift' | 'restart' | 'video';
+  | 'home' | 'shop' | 'stickers' | 'trophy' | 'gift' | 'restart' | 'video' | 'help';
 
 export const ICONS: Record<IconKey, (w?: number) => string> = {
   settings: w => btn(`<path d="${gearPath}" fill="#fff" ${S}/><circle r="5" fill="#3D8BFF" ${S}/>`, { w }),
@@ -184,6 +189,7 @@ export const ICONS: Record<IconKey, (w?: number) => string> = {
   gift: w => btn(`<rect x="-11" y="-4" width="22" height="15" rx="2" fill="#fff"/><rect x="-13" y="-9" width="26" height="6" rx="2" fill="#fff"/><rect x="-2" y="-9" width="4" height="20" fill="#FF4D6D"/><path d="M0 -9 q-9 -8 -10 -1 M0 -9 q9 -8 10 -1" stroke="#FF4D6D" stroke-width="3" fill="none"/>`, { fill: '#5FCB5A', dark: '#2E9440', w }),
   restart: w => btn(`<path d="M9 -6 A11 11 0 1 0 10 5" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M4 -12 L12 -7 L5 -1 Z" fill="#fff" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>`, { w }),
   video: w => btn(`<rect x="-13" y="-9" width="26" height="18" rx="4" fill="#fff"/><path d="M-3 -5 L6 0 L-3 5 Z" fill="#5FCB5A"/>`, { fill: '#5FCB5A', dark: '#2E9440', w }),
+  help: w => btn(`<path d="M-6.5 -5 A6.8 6.8 0 1 1 3 1.4 Q0 2.8 0 6" stroke="${INK}" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M-6.5 -5 A6.8 6.8 0 1 1 3 1.4 Q0 2.8 0 6" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cy="12.5" r="4.2" fill="${INK}"/><circle cy="12.5" r="2.6" fill="#fff"/>`, { ...PURPLE, w }),
 };
 
 // ---------------------------------------------------------------- boosters

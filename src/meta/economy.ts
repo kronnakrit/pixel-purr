@@ -24,7 +24,7 @@ export const DEFAULT_ECONOMY: EconomyConfig = freeze({
   spicyWinCoins: 40,
   freeBoostersOnUnlock: 3,
   boosters: {
-    slot: { key: 'slot', name: 'Extra Cushion', unlock: 4, price: 900, does: 'Adds a 6th tray slot for the rest of the level.' },
+    slot: { key: 'slot', name: 'Extra Cushion', unlock: 4, price: 900, does: 'Adds one more tray slot for the rest of the level.' },
     shuffle: { key: 'shuffle', name: 'Yarn Shuffle', unlock: 6, price: 600, does: 'Re-deals the order of every waiting Purrlet. Linked pairs stay put.' },
     nap: { key: 'nap', name: 'Cat Nap', unlock: 9, price: 1200, does: 'Sends every tray Purrlet to the end of the shortest queues, emptying the tray.' },
     xray: { key: 'xray', name: 'X-Ray Specs', unlock: 13, price: 1500, does: 'The next Purrlet you send sees through other colours for one lap.' },

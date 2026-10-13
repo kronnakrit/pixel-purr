@@ -8,6 +8,7 @@ import { boosterUnlockCard, buyBoosterCard, dailyCard, failCard, introCard, live
 import { CoinCounter, type Ctx, type Layers } from './ctx';
 import { h } from './dom';
 import { coinsFly, createToaster, createTutorial, createVeil } from './fx';
+import { helpPage } from './help';
 import { createHome } from './home';
 import { createHud, type Hud } from './hud';
 import { Modals } from './modal';
@@ -89,6 +90,7 @@ export function createUi(): Ui {
     dailyGift: g => dailyCard(modals, g),
     outOfLives: (l, cost, canAfford, videoReady) => livesCard(modals, l, cost, canAfford, videoReady),
     offer: o => offerCard(modals, o),
+    help: info => helpPage(modals, ctx, info),
     buyBooster: (k, price, canAfford, videoReady = true) => buyBoosterCard(modals, k, price, canAfford, videoReady),
     toast: t => ctx.toast(t),
     coinsFly: (from, amount) => coinsFly(ctx, hud, from, amount),

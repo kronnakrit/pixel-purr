@@ -85,7 +85,12 @@ export class Modals {
     e.el.setAttribute('aria-hidden', 'true');
     setTimeout(() => e.el.remove(), this.ctx.rm() ? 160 : 200);
     const top = this.stack[this.stack.length - 1];
-    if (top) { top.el.classList.remove('pp-under'); this.fit(top); }
+    if (top) {
+      top.el.classList.remove('pp-under');
+      this.fit(top);
+      // the closed one was on top: hand focus back so screen readers read out the dialog showing again
+      if (i === this.stack.length) top.el.focus({ preventScroll: true });
+    }
     this.syncBackdrop();
   }
 

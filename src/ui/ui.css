@@ -160,6 +160,8 @@
 }
 @keyframes pp-glowring { from { opacity: .65; } to { opacity: 1; } }
 .pp-ui .pp-boost:active:not([aria-disabled="true"]) { transform: translateY(3px) scale(.96); }
+.pp-bhelp { width: 40px; height: 40px; flex: none; align-self: center; position: relative; }
+.pp-bhelp::after { content: ''; position: absolute; inset: -4px; } /* 48 px to tap */
 
 @media (max-width: 399px) {
   .pp-level { min-width: 112px; padding: 0 16px; }
@@ -178,6 +180,11 @@
   .pp-titlepill { min-width: 0; }
   .pp-boost, .pp-boost-art, .pp-boost-art > svg { width: 54px; height: 54px; }
   .pp-lockic { left: 12px; top: 8px; }
+  .pp-bbar-in { padding: 0; }
+  .pp-price { padding: 0 5px 0 1px; }
+  .pp-price-t { font-size: 12px; }
+  .pp-bhelp { width: 34px; height: 34px; }
+  .pp-bhelp::after { inset: -6px -2px; }
 }
 
 /* ------------------------------------------------------------ stage background (home, pages, veil) */
@@ -355,6 +362,10 @@
 .pp-bigic { width: 62px; height: 62px; }
 .pp-bigic-t { font-size: 15px; --sw: 3.4px; margin-top: 2px; }
 .pp-pause .pp-note { margin-top: 6px; }
+.pp-actions .pp-helppill { width: min(200px, 100%); }
+.pp-inlic { width: 18px; vertical-align: -4px; margin: 0 1px; }
+.pp-nowrap { white-space: nowrap; }
+.pp-unlock-hint { max-width: 250px; }
 
 /* daily */
 .pp-days { display: flex; justify-content: center; gap: 4px; margin: 0 -8px 8px; }
@@ -451,6 +462,40 @@
 .pp-sticker-t b { color: var(--gold); }
 .pp-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 48px 20px; text-align: center; }
 .pp-empty-cat > svg { width: 128px; }
+
+/* help */
+.pp-help-h { font-size: 25px; --sw: 5px; margin: 8px 4px 2px; text-align: left; }
+.pp-help-h ~ .pp-help-h { margin-top: 26px; }
+.pp-help-lead { margin: 0 4px 2px; text-align: left; font-size: 14px; }
+.pp-helpb, .pp-helpr { background: linear-gradient(#5546AE, #463894); border: 3px solid var(--ink); border-radius: 24px; box-shadow: 0 5px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, .1); text-align: left; }
+.pp-helpb { margin-top: 14px; padding: 10px 12px 12px; }
+.pp-helpb-head { display: flex; align-items: center; gap: 10px; }
+.pp-helpb-ic, .pp-helpb-ic > svg { width: 52px; height: 52px; flex: none; }
+.pp-helpb.pp-locked .pp-helpb-ic { filter: grayscale(1) brightness(.6) contrast(.9); }
+.pp-helpb-name { flex: 1; min-width: 0; font-size: 22px; --sw: 4.6px; }
+.pp-helpb-tag { flex: none; padding: 3px 10px 2px; border-radius: 12px; background: #FF4D6D; border: 2px solid var(--ink); font-size: 14px; --sw: 3px; text-shadow: none; white-space: nowrap; }
+.pp-helpb-tag.pp-lock, .pp-helpb-tag.pp-zero { background: #2A2058; color: var(--muted); -webkit-text-stroke: 0; }
+.pp-helpb-demo { display: flex; justify-content: center; margin: 10px 0 10px; padding: 12px 10px; border-radius: 16px; background: #2A2058; box-shadow: inset 0 3px 0 rgba(0, 0, 0, .25); }
+.pp-helpb-demo > svg { width: 100%; max-width: 290px; height: auto; }
+.pp-helpb-does { margin: 0 2px 8px; }
+.pp-helpb-when { margin: 0; padding: 7px 11px; border-radius: 14px; background: rgba(255, 212, 59, .13); font: 800 14px/1.35 var(--pp-body); color: var(--soft); }
+.pp-helpb-when b { font-weight: 900; color: var(--gold); }
+.pp-helpr { display: grid; grid-template-columns: 80px 1fr; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 14px 10px 10px; }
+.pp-helpr-ic { display: flex; justify-content: center; }
+.pp-helpr-ic > svg { width: 60px; height: auto; max-height: 68px; }
+.pp-helpr-linked .pp-helpr-ic > svg { width: 80px; }
+.pp-helpr-spicy .pp-helpr-ic > svg { width: 40px; }
+.pp-helpr-t { font-size: 18px; --sw: 4px; margin-bottom: 2px; }
+.pp-helpr .pp-sub { margin: 0; font-size: 14px; }
+@media (max-width: 359px) {
+  .pp-helpb-ic, .pp-helpb-ic > svg { width: 44px; height: 44px; }
+  .pp-helpb-head { gap: 8px; }
+  .pp-helpb-name { font-size: 19px; --sw: 4px; }
+  .pp-helpr { grid-template-columns: 60px 1fr; gap: 10px; }
+  .pp-helpr-ic > svg { width: 50px; }
+  .pp-helpr-linked .pp-helpr-ic > svg { width: 60px; }
+  .pp-helpr-spicy .pp-helpr-ic > svg { width: 34px; }
+}
 
 /* ------------------------------------------------------------ fx */
 .pp-toast {

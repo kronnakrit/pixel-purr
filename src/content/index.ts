@@ -13,13 +13,15 @@ export const LEVEL_FILES = [...PACK_21_60, ...PACK_61_100] as unknown as readonl
 export const INTROS: Readonly<Record<number, IntroKey>> = { 1: 'basics', 2: 'tray', 5: 'spicy', 7: 'mystery', 12: 'linked', 18: 'background' };
 export const UNLOCKS: Readonly<Record<number, BoosterKey>> = { 4: 'slot', 6: 'shuffle', 9: 'nap', 13: 'xray' };
 
+const INTRO_LEVEL = Object.fromEntries(Object.entries(INTROS).map(([n, k]) => [k, Number(n)])) as Readonly<Record<IntroKey, number>>;
+
 const CARDS: Readonly<Record<IntroKey, { title: string; body: string }>> = {
   basics: { title: 'Tap a Purrlet', body: 'Tap the kitten at the front of a queue and it rides the belt, painting every pixel of its colour it can see.' },
-  tray: { title: 'Leftovers take a nap', body: 'A Purrlet with paint left naps on a cushion until you tap it again, but if every cushion is taken the level ends.' },
+  tray: { title: 'Leftovers take a nap', body: 'A Purrlet with paint left naps on a cushion until you tap it again, and if no cushion is free for it the level ends.' },
   spicy: { title: 'Colours under colours', body: 'Some colours are buried beneath others, so think about who goes first and keep a cushion free.' },
   mystery: { title: 'Mystery Purrlet', body: 'A grey Purrlet shows its colour once it reaches the front of its queue.' },
   linked: { title: 'Linked Purrlets', body: 'Two friends tied with a ribbon ride together, so both must be at the front before you tap.' },
-  background: { title: 'Paint the whole board', body: 'This picture fills every pixel, so start from the edges and work your way in.' },
+  background: { title: 'Paint the whole board', body: 'Some pictures fill every pixel of the board, so start from the edges and work your way in.' },
 };
 
 function fileFor(n: number): LevelFileV1 {
@@ -99,4 +101,5 @@ export const content: ContentApi = {
   },
 
   introCard: k => CARDS[k],
+  introLevel: k => INTRO_LEVEL[k],
 };

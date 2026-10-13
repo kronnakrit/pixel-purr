@@ -1,13 +1,13 @@
-// The game controller: boot, the home loop and its screens (shop, Sticker Book, daily gift, settings), and level
+// The game controller: boot, the home loop and its screens (shop, Sticker Book, daily gift, settings, help), and level
 // play (lives gate, booster unlock and intro cards, attempts). It talks to every module only through the
 // contracts, and gets time from injected now() / raf(), so tests drive it headlessly with fakes and a manual clock.
 import type { Level } from '../engine';
 import type {
-  AdsApi, AnalyticsApi, AudioApi, BoosterKey, ContentApi, GameSceneApi, HomeChoice, HomeState, LevelMeta, MetaApi, PauseOptions, PlatformApi,
+  AdsApi, AnalyticsApi, AudioApi, BoosterKey, ContentApi, GameSceneApi, HelpInfo, HomeChoice, HomeState, LevelMeta, MetaApi, PauseOptions, PlatformApi,
   Point, Product, ProductContents, ProductId, PurchaseFailure, PurchasesApi, RemoteConfigApi, Reward, RewardedPlacement, Settings, ShopState,
   StoreTransaction,
 } from './contracts';
-import { BOOSTER_KEYS } from './contracts';
+import { BOOSTER_KEYS, INTRO_KEYS } from './contracts';
 import type { AppUi, SessionHost } from './host';
 import { Session } from './session';
 import { describeReward, PRODUCT_IDS } from './text';
@@ -173,6 +173,7 @@ export class App implements SessionHost {
     const idleHome = () => this.screen === 'home' && !this.modals.length && !this.homeBusy;
     hud.onPause(() => { if (this.session) void this.session.pause(); else if (idleHome()) this.enqueue({ kind: 'choice', c: 'settings' }); });
     hud.onShop(() => { if (this.session) void this.session.shop(); else if (idleHome()) this.enqueue({ kind: 'choice', c: 'shop' }); });
+    hud.onHelp(() => void this.session?.help());
     hud.onLivesDue(() => this.syncHud());
     ui.onSfx(s => { audio.play(s); if (s === 'button') audio.haptic('light'); });
 
@@ -466,9 +467,24 @@ export class App implements SessionHost {
     await this.ask('settings', () => this.ui.pause('home', this.meta.settings, p => this.settingsChanged(p), this.pauseOptions()));
   }
 
-  /** Settings links: the privacy policy, and "Privacy choices" where the ad consent rules require them. */
+  /** Help page: what each booster does and the rules met so far. Opens from the "?" during play (Session.help) and
+   *  over the pause or settings card. */
+  async help(): Promise<void> {
+    if (this.modals.includes('help')) return;
+    const { meta, content } = this, reached = Math.max(meta.level, this.session?.n ?? 0);
+    const info: HelpInfo = {
+      boosters: BOOSTER_KEYS.map(key => ({ key, unlocked: meta.isBoosterUnlocked(key), count: meta.boosterCount(key) })),
+      rules: INTRO_KEYS.filter(k => content.introLevel(k) <= reached)
+        .sort((a, b) => content.introLevel(a) - content.introLevel(b))
+        .map(key => ({ key, ...content.introCard(key) })),
+    };
+    this.analytics.screen('help');
+    await this.ask('help', () => this.ui.help(info));
+  }
+
+  /** Settings links: the privacy policy, "Privacy choices" where the ad consent rules require them, and help. */
   pauseOptions(): PauseOptions {
-    const o: PauseOptions = {}, url = this.deps.privacyPolicyUrl;
+    const o: PauseOptions = { help: () => void this.help() }, url = this.deps.privacyPolicyUrl;
     if (url) o.policy = () => this.platform.openUrl(url);
     if (this.ads.privacyOptionsRequired) o.privacy = () => void this.ads.showPrivacyOptions().catch(e => console.warn('app: privacy options failed', e));
     return o;

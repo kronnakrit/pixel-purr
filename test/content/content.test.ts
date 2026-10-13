@@ -1,7 +1,7 @@
 // Content: every shipped level loads, keeps the rules, is proven solvable and sits in its difficulty band;
 // pictures and names are unique; the cheap picture path matches the built levels; metadata and intro cards.
 import { describe, expect, it } from 'vitest';
-import { BOOSTER_KEYS, type IntroKey } from '../../src/app/contracts';
+import { BOOSTER_KEYS, INTRO_KEYS, type IntroKey } from '../../src/app/contracts';
 import { content, LEVEL_FILES, SHIPPED } from '../../src/content';
 import { contentParams, FIRST_FILE_LEVEL, LAST_FILE_LEVEL, packOf, PACKS } from '../../src/content/params';
 import { FILE_PICTURES } from '../../src/content/recipes';
@@ -172,6 +172,13 @@ describe('levelMeta', () => {
   it('rejects bad level numbers', () => {
     expect(() => content.levelMeta(0)).toThrow();
     expect(() => content.getLevel(1.5)).toThrow();
+  });
+});
+
+describe('introLevel', () => {
+  it('names the level whose intro card teaches each rule', () => {
+    for (const k of INTRO_KEYS) expect(content.levelMeta(content.introLevel(k)).intro).toBe(k);
+    expect(INTRO_KEYS.map(k => content.introLevel(k))).toEqual([1, 2, 5, 7, 12, 18]);
   });
 });
 

@@ -20,7 +20,7 @@ Installed runtime packages: `three`, `@capacitor/core`, `@capacitor/app`, `@capa
 | Services | `src/services/` | Ads (AdMob), purchases (RevenueCat), remote config, analytics, platform (splash, back button, pause). Web builds use built-in mocks. |
 | Audio | `src/audio/` | Synthesised sound effects (Web Audio, no files), a gentle music loop, haptics. Maps engine events to sound + haptics. |
 | Render | `src/render/` | The Three.js play field. `purrlet/`: the kitten model and its animations. `scene/`: pixels, belt, dock, tray, queues, riders, effects, camera, tap input. |
-| UI | `src/ui/` | HUD, booster bar, every screen and modal (home map, intro cards, win, fail, shop, pause, Sticker Book, daily gift, offers), tutorial pointer, flying coins. SVG art kit ported from the design page. |
+| UI | `src/ui/` | HUD, booster bar, every screen and modal (home map, intro cards, win, fail, shop, pause, help, Sticker Book, daily gift, offers), tutorial pointer, flying coins. SVG art kit ported from the design page. |
 | App | `src/app/` | `contracts.ts` (the interfaces between modules) and the controller that runs the game flow. `src/main.ts` boots it. |
 
 Modules talk only through the interfaces in `src/app/contracts.ts`. Each module's `index.ts` exports exactly what the contract file names:
@@ -50,12 +50,12 @@ Modules talk only through the interfaces in `src/app/contracts.ts`. Each module'
 
 | Key | Name | Unlock | Price | Effect | Engine call |
 | --- | --- | --- | --- | --- | --- |
-| `slot` | Extra Cushion | 4 | 900 | Adds a 6th tray slot (dashed gold) for the rest of the level. | `game.addTraySlot()` |
+| `slot` | Extra Cushion | 4 | 900 | Adds one more tray slot (dashed gold) for the rest of the level. | `game.addTraySlot()` |
 | `shuffle` | Yarn Shuffle | 6 | 600 | Re-deals the order of every waiting Purrlet (linked pairs stay put). | `game.shuffleQueues(rng)` |
 | `nap` | Cat Nap | 9 | 1200 | Sends every tray Purrlet to the end of the shortest queues, emptying the tray. | `game.napTray()` |
 | `xray` | X-Ray Specs | 13 | 1500 | The next Purrlet launched sees through other colours for one lap. | `game.armXray()` |
 
-Boosters are used from the booster bar during play. With none left, tapping one offers to buy it for coins (or a rewarded video for one).
+Boosters are used from the booster bar during play. With none left, tapping one offers to buy it for coins (or a rewarded video for one). The "?" at the end of the bar (and Help on the pause and settings cards) opens the help page: what each booster does, with a small picture of it working, then the rules the player has met so far.
 
 ## Engine API used by the app
 
@@ -109,7 +109,7 @@ Product ids: `coins_pouch`, `coins_basket`, `coins_jar`, `coins_treasure`, `cosy
 
 ### Gameplay screen layout (portrait, top to bottom)
 
-Top HUD (pause button, blue level pill, coin chip with +) → board with belt (square, as wide as the screen allows) → tray row → queues (front Purrlet biggest, two more behind it getting smaller and dimmer) → booster bar (4 round buttons with count badges). The scene reads the HUD heights from `ui.hud.insets()` and fits everything in between.
+Top HUD (pause button, blue level pill, coin chip with +) → board with belt (square, as wide as the screen allows) → tray row → queues (front Purrlet biggest, two more behind it getting smaller and dimmer) → booster bar (4 round buttons with count badges, then a small "?" for the help page). The scene reads the HUD heights from `ui.hud.insets()` and fits everything in between.
 
 ### Animation timings
 

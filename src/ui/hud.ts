@@ -1,4 +1,4 @@
-// HUD: top bar (gear, level pill or lives, coin chip) and the booster bar for play mode.
+// HUD: top bar (gear, level pill or lives, coin chip) and the booster bar (with its "?" help button) for play mode.
 import type { BoosterButtonState, BoosterKey, HudApi, LivesInfo, Point, ScreenInsets } from '../app/contracts';
 import { BOOSTER_KEYS } from '../app/contracts';
 import { ICONS, boosterArt, coin, flame, heart, infinity } from './art';
@@ -42,7 +42,7 @@ export function coinChip(ctx: Ctx, onPlus: (() => void) | null): HTMLElement {
 export function createHud(ctx: Ctx): Hud {
   let mode: HudMode = 'hidden';
   let pauseCb: () => void = () => {}, shopCb: () => void = () => {}, boosterCb: (k: BoosterKey) => void = () => {};
-  let homeCb: ((c: 'settings' | 'shop') => void) | null = null, dueCb: () => void = () => {};
+  let homeCb: ((c: 'settings' | 'shop') => void) | null = null, dueCb: () => void = () => {}, helpCb: () => void = () => {};
 
   // ---- top bar
   const gear = iconBtn(ICONS.settings(48), 'Pause', () => (mode === 'home' && homeCb ? homeCb('settings') : pauseCb()), 'pp-gear');
@@ -69,6 +69,8 @@ export function createHud(ctx: Ctx): Hud {
     tiles.set(k, { b, s: null });
     row.append(b);
   }
+  // what the boosters do, right where the player wonders about them
+  row.append(iconBtn(ICONS.help(40), 'Help: what boosters do', () => helpCb(), 'pp-bhelp'));
   const bbar = h('div', 'pp-bbar', row);
   bbar.setAttribute('role', 'toolbar');
   bbar.setAttribute('aria-label', 'Boosters');
@@ -152,6 +154,7 @@ export function createHud(ctx: Ctx): Hud {
     onBooster(cb) { boosterCb = cb; },
     onPause(cb) { pauseCb = cb; },
     onShop(cb) { shopCb = cb; },
+    onHelp(cb) { helpCb = cb; },
     onHome(cb) { homeCb = cb; },
     onLivesDue(cb) { dueCb = cb; },
     insets(): ScreenInsets {

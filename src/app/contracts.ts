@@ -9,6 +9,7 @@ export const BOOSTER_KEYS: readonly BoosterKey[] = ['slot', 'shuffle', 'nap', 'x
 
 /** One-time cards shown the first time a mechanic appears. */
 export type IntroKey = 'basics' | 'tray' | 'spicy' | 'mystery' | 'linked' | 'background';
+export const INTRO_KEYS: readonly IntroKey[] = ['basics', 'tray', 'spicy', 'mystery', 'linked', 'background'];
 
 export interface Point { x: number; y: number }
 
@@ -62,6 +63,8 @@ export interface ContentApi {
   /** The level's picture only (cheap), for the map and the Sticker Book. */
   levelPicture(n: number): Picture;
   introCard(k: IntroKey): { title: string; body: string };
+  /** The level whose intro card teaches k. */
+  introLevel(k: IntroKey): number;
 }
 
 // ---------------------------------------------------------------- meta (src/meta)
@@ -329,6 +332,8 @@ export interface HudApi {
   onPause(cb: () => void): void;
   /** Coin chip "+" button. */
   onShop(cb: () => void): void;
+  /** "?" button at the end of the booster bar: the help page. */
+  onHelp(cb: () => void): void;
   /** Measured HUD bars + safe areas, for the scene. */
   insets(): ScreenInsets;
   /** Screen position of the coin chip (target for flying coins). */
@@ -339,9 +344,16 @@ export interface HudApi {
   onLivesDue(cb: () => void): void;
 }
 
-/** Links on the pause / settings card: the privacy policy (always), and ad "Privacy choices" where the consent
- *  rules require them. */
-export interface PauseOptions { policy?: () => void; privacy?: () => void }
+/** Links on the pause / settings card: the privacy policy (always), ad "Privacy choices" where the consent
+ *  rules require them, and the help page. */
+export interface PauseOptions { policy?: () => void; privacy?: () => void; help?: () => void }
+
+/** The help page: what every booster does (locked ones say when they unlock) and the rules the player has met. */
+export interface HelpInfo {
+  boosters: { key: BoosterKey; unlocked: boolean; count: number }[];
+  /** Intro cards up to the player's level, in level order. */
+  rules: { key: IntroKey; title: string; body: string }[];
+}
 
 export interface UiApi {
   mount(root: HTMLElement): void;
@@ -358,6 +370,8 @@ export interface UiApi {
   dailyGift(g: { day: number; reward: Reward; videoReady: boolean }): Promise<'claim' | 'double'>;
   outOfLives(l: LivesInfo, refillCost: number, canAfford: boolean, videoReady: boolean): Promise<'coins' | 'video' | 'close'>;
   offer(o: OfferInfo): Promise<'buy' | 'close'>;
+  /** Help page: boosters and rules. Opens over the pause or settings card too. */
+  help(info: HelpInfo): Promise<void>;
   /** Confirm spending coins on a booster the player has none of. videoReady shows the "free with a video" choice. */
   buyBooster(k: BoosterKey, price: number, canAfford: boolean, videoReady: boolean): Promise<'buy' | 'video' | 'close'>;
   toast(text: string): void;

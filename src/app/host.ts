@@ -1,7 +1,7 @@
 // What the controller's parts (session, tutorial) need from the app around them. Kept apart from controller.ts so
 // the pieces depend on a small interface instead of on each other.
 import type {
-  AdsApi, AnalyticsApi, AudioApi, BoosterKey, ContentApi, GameSceneApi, MetaApi, Point, RewardedPlacement, Settings, UiApi,
+  AdsApi, AnalyticsApi, AudioApi, BoosterKey, ContentApi, GameSceneApi, MetaApi, PauseOptions, Point, RewardedPlacement, Settings, UiApi,
 } from './contracts';
 
 /** The UI as the app sees it. */
@@ -30,9 +30,11 @@ export interface SessionHost {
   interstitial(): Promise<boolean>;
   offer(kind: 'starter' | 'removeAds'): Promise<void>;
   shop(): Promise<void>;
+  /** The help page (boosters and rules). */
+  help(): Promise<void>;
   settingsChanged(p: Partial<Settings>): void;
-  /** Extras for the pause / settings card (the "Privacy choices" button). */
-  pauseOptions(): { privacy?: () => void };
+  /** Extras for the pause / settings card (privacy links, help). */
+  pauseOptions(): PauseOptions;
   /** Push coins and lives to the HUD. */
   syncHud(): void;
   boosterPoint(k: BoosterKey): Point | null;

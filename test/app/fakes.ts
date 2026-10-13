@@ -3,7 +3,7 @@
 import { assemble, level as engineLevel, paramsFor, type Game, type GameEvent, type Level, type Picture, type Purrlet } from '../../src/engine';
 import {
   BOOSTER_KEYS, type AdsApi, type AnalyticsApi, type AudioApi, type BoosterButtonState, type BoosterKey, type BoosterPrice,
-  type ContentApi, type EconomyConfig, type FailInfo, type GameSceneApi, type HomeChoice, type HomeState, type HudApi, type IntroKey,
+  type ContentApi, type EconomyConfig, type FailInfo, type GameSceneApi, type HelpInfo, type HomeChoice, type HomeState, type HudApi, type IntroKey,
   type LevelMeta, type LivesInfo, type MetaApi, type OfferInfo, type PlatformApi, type Point, type Product, type ProductContents,
   type PauseOptions, type ProductId, type PurchaseFailure, type PurchasesApi, type ShopActions, type StoreTransaction, type RemoteConfigApi, type Reward, type RewardedPlacement, type ScreenInsets, type Settings,
   type Sfx, type ShopState, type TapTarget, type WinInfo,
@@ -63,6 +63,7 @@ export class FakeContent implements ContentApi {
   }
   levelPicture(n: number): Picture { return { w: 2, h: 2, px: new Uint8Array([1, 2, 3, 4]), name: `pic${n}` }; }
   introCard(k: IntroKey) { return { title: `title:${k}`, body: `body:${k}` }; }
+  introLevel(k: IntroKey): number { return Number(Object.entries(INTROS).find(([, v]) => v === k)![0]); }
 }
 
 // ---------------------------------------------------------------- meta
@@ -385,6 +386,7 @@ export class FakeHud implements HudApi {
   boosterCb: (k: BoosterKey) => void = () => {};
   pauseCb: () => void = () => {};
   shopCb: () => void = () => {};
+  helpCb: () => void = () => {};
   dueCb: () => void = () => {};
   mode(m: 'home' | 'play' | 'hidden') { this.modeNow = m; }
   setLevel(n: number, spicy: boolean) { this.level = [n, spicy]; }
@@ -394,6 +396,7 @@ export class FakeHud implements HudApi {
   onBooster(cb: (k: BoosterKey) => void) { this.boosterCb = cb; }
   onPause(cb: () => void) { this.pauseCb = cb; }
   onShop(cb: () => void) { this.shopCb = cb; }
+  onHelp(cb: () => void) { this.helpCb = cb; }
   insets(): ScreenInsets { return { top: 90, bottom: 110, left: 0, right: 0 }; }
   coinChip(): Point { return { x: 340, y: 40 }; }
   boosterPoint(_k: BoosterKey): Point | null { return null; }
@@ -401,11 +404,11 @@ export class FakeHud implements HudApi {
   button(k: BoosterKey) { return this.bar.find(b => b.key === k)!; }
 }
 
-type Modal = 'home' | 'intro' | 'boosterUnlock' | 'win' | 'fail' | 'pause' | 'shop' | 'stickerBook' | 'dailyGift' | 'outOfLives' | 'offer' | 'buyBooster' | 'coinsFly';
+type Modal = 'home' | 'intro' | 'boosterUnlock' | 'win' | 'fail' | 'pause' | 'shop' | 'stickerBook' | 'dailyGift' | 'outOfLives' | 'offer' | 'buyBooster' | 'help' | 'coinsFly';
 /** What the Android back button resolves an open card with (the real UI's closeTop does the same kind of thing). */
 const ON_BACK: Partial<Record<Modal, unknown>> = {
   intro: undefined, boosterUnlock: undefined, win: 'continue', fail: 'giveup', pause: 'resume', shop: undefined, stickerBook: undefined,
-  dailyGift: 'claim', outOfLives: 'close', offer: 'close', buyBooster: 'close',
+  dailyGift: 'claim', outOfLives: 'close', offer: 'close', buyBooster: 'close', help: undefined,
 };
 
 /** UI whose cards stay open until the test answers them, unless an auto-answer is set for that card. */
@@ -465,6 +468,7 @@ export class FakeUi implements AppUi {
     return this.ask<'coins' | 'video' | 'close'>('outOfLives', [{ l, refillCost, canAfford, videoReady }]);
   }
   offer(o: OfferInfo) { return this.ask<'buy' | 'close'>('offer', [o]); }
+  help(info: HelpInfo) { return this.ask<void>('help', [info]); }
   buyBooster(k: BoosterKey, price: number, canAfford: boolean, videoReady: boolean) {
     return this.ask<'buy' | 'video' | 'close'>('buyBooster', [{ k, price, canAfford, videoReady }]);
   }

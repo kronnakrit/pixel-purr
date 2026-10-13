@@ -1,10 +1,13 @@
 // Dev harness for the interface (dev/ui.html): ?screen=hud-play|hud-home|home|intro|unlock|win|fail|pause|shop|stickers|
-// daily|lives|offer|buybooster|tutorial|loading|coins renders that screen with sample data over a purple stage and a
+// daily|lives|offer|buybooster|help|tutorial|loading|coins renders that screen with sample data over a purple stage and a
 // static stand-in play field. Options: rm=1 (reduced motion), sat/sab (fake safe areas, px), k (intro key), kind
-// (offer), mode=home (settings), empty=1 (sticker book), afford=0, video=0, spicy=1, day=N, bar=1 (screen buttons).
+// (offer), mode=home (settings), empty=1 (sticker book), afford=0, video=0, spicy=1, day=N, level=N (hud-play, help),
+// bar=1 (screen buttons).
 // Choices resolve into a toast and the screen reopens. window.__ui exposes the UI for --eval.
 import '../fonts';
-import type { BoosterButtonState, HomeState, IntroKey, LivesInfo, Product, ProductId, Reward, Settings } from '../app/contracts';
+import type { BoosterButtonState, HelpInfo, HomeState, IntroKey, LivesInfo, Product, ProductId, Reward, Settings } from '../app/contracts';
+import { INTRO_KEYS } from '../app/contracts';
+import { content } from '../content';
 import { PICTURES, paramsFor, raster, type Picture } from '../engine';
 import { pictureCanvas, purrlet, tray } from './art';
 import { createUi } from './index';
@@ -44,6 +47,12 @@ const boosters = (level: number): BoosterButtonState[] => [
   { key: 'nap', unlocked: level >= 9, count: 1, price: 1200, enabled: false, active: false },
   { key: 'xray', unlocked: level >= 13, count: 2, price: 1500, enabled: true, active: qs.get('armed') === '1' },
 ];
+/** What the controller would pass to ui.help() for a player on this level. */
+const helpInfo = (level: number): HelpInfo => ({
+  boosters: boosters(level).map(b => ({ key: b.key, unlocked: b.unlocked, count: b.count })),
+  rules: INTRO_KEYS.filter(k => content.introLevel(k) <= level).sort((a, b) => content.introLevel(a) - content.introLevel(b))
+    .map(key => ({ key, ...content.introCard(key) })),
+});
 const say = (v: unknown) => ui.toast(`→ ${String(v)}`);
 const again = (f: () => Promise<unknown>) => { void f().then(v => { say(v); setTimeout(() => again(f), 900); }); };
 
@@ -82,8 +91,9 @@ function play(level = 12, spicy = flag('spicy', false)) {
   ui.hud.setCoins(560);
   ui.hud.setBoosters(boosters(level));
   ui.hud.onBooster(k => ui.toast(`booster ${k}`));
-  ui.hud.onPause(() => void ui.pause('play', settings, p => Object.assign(settings, p)).then(say));
+  ui.hud.onPause(() => void ui.pause('play', settings, p => Object.assign(settings, p), { help: () => void ui.help(helpInfo(level)) }).then(say));
   ui.hud.onShop(() => ui.toast('shop'));
+  ui.hud.onHelp(() => void ui.help(helpInfo(level)));
   requestAnimationFrame(() => fakeField(level, pic(level)));
 }
 
@@ -122,7 +132,7 @@ const SCREENS: Record<string, () => void> = {
   pause: () => {
     const mode = qs.get('mode') === 'home' ? 'home' : 'play';
     if (mode === 'home') void ui.home(homeState()); else play(18);
-    again(() => ui.pause(mode, settings, p => { Object.assign(settings, p); ui.toast(JSON.stringify(p)); }));
+    again(() => ui.pause(mode, settings, p => { Object.assign(settings, p); ui.toast(JSON.stringify(p)); }, { help: () => void ui.help(helpInfo(18)), policy: () => ui.toast('policy') }));
   },
   shop: () => { ui.hud.setCoins(1240); again(() => ui.shop({ coins: 1240, products: PRODUCTS, owned: qs.get('owned') === '1' ? ['cosy_bundle'] : [], removeAds: qs.get('owned') === '1', videoReady: flag('video'), videoCoins: 100, rewards: REWARDS }, shopActions)); },
   stickers: () => {
@@ -137,6 +147,7 @@ const SCREENS: Record<string, () => void> = {
     const id: ProductId = kind === 'starter' ? 'starter_bundle' : 'remove_ads';
     again(() => ui.offer({ kind, product: PRODUCTS.find(p => p.id === id) ?? null, reward: REWARDS[id] }));
   },
+  help: () => { const n = Number(qs.get('level') ?? 20); play(n); again(() => ui.help(helpInfo(n))); },
   buybooster: () => { play(12); again(() => ui.buyBooster((qs.get('k') ?? 'shuffle') as 'shuffle', 600, flag('afford'), flag('video'))); },
   tutorial: () => {
     play(Number(qs.get('level') ?? 1));
